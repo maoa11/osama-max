@@ -163,7 +163,8 @@ h2.sec{font-size:15px;font-weight:700;color:var(--muted);margin:0 0 12px;display
 .quote .src{font-size:12px;color:var(--muted);margin-top:8px}
 
 /* backup strip */
-.backup{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.backup{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:4px 4px 16px}
+.backup[hidden]{display:none}
 .backup .sub{margin:0}
 
 /* empty */
@@ -254,12 +255,9 @@ h2.sec{font-size:15px;font-weight:700;color:var(--muted);margin:0 0 12px;display
 
       <div class="card quote" id="quote"></div>
 
-      <div class="card backup">
-        <div>
-          <div style="font-weight:700">نسخة احتياطية</div>
-          <div class="sub" id="backup-age"></div>
-        </div>
-        <button class="btn btn-line btn-sm" data-act="export">تصدير JSON</button>
+      <div class="backup" id="backup" hidden>
+        <span class="sub" id="backup-age"></span>
+        <button class="btn btn-line btn-sm" data-act="export">نسخة احتياطية</button>
       </div>
     </section>
 
@@ -329,17 +327,10 @@ function seed(){
     ],
     tasks: [],
     pending: [
-      { id:uid(), text:'وضع الإقامة — أسأل محمد: هل سلة تقدر تستخرج إقامة عمل؟', urgent:true, done:false },
       { id:uid(), text:'رفع راتب سلة — إرسال رسالة التفاوض', urgent:false, done:false },
       { id:uid(), text:'رغد — إرسال الأسئلة الأربعة', urgent:false, done:false },
       { id:uid(), text:'اللوقو الرسمي لـ«ديوانية سلة» — أطلبه من محمد', urgent:false, done:false }
     ],
-    legal: {
-      status:'زيارة في السعودية',
-      problem:'الفواتير تحتاج سجل تجاري أو وثيقة عمل حر — والاثنين يحتاجون إقامة',
-      next:'أسأل محمد مباشرة — هل سلة تقدر تستخرج إقامة عمل؟',
-      priority:'قصوى — هذا الشي الوحيد الي يقدر يسقط الثلاثة مصادر مرة وحدة'
-    },
     videos: [],        // Salla production line
     perf: [],          // published content performance
     invoices: [],
@@ -375,6 +366,8 @@ function load(){
   try { S = JSON.parse(localStorage.getItem(KEY)); } catch(e){ S = null; }
   if(!S || !S.version){ S = seed(); save(); }
   // forward-compat: add any keys a newer seed introduced, never overwrite
+  // v1 → removed the residency topic: drop it from data saved by the first release
+  if(S.legal){ delete S.legal; S.pending = S.pending.filter(function(p){ return p.text.indexOf('وضع الإقامة')!==0; }); save(); }
   var base = seed();
   for(var k in base){ if(!(k in S)) S[k] = base[k]; }
   for(var s in base.settings){ if(!(s in S.settings)) S.settings[s] = base.settings[s]; }
@@ -505,9 +498,9 @@ function renderToday(){
   var ul = document.getElementById('today-tasks');
   document.getElementById('tasks-count').textContent = doneToday.length ? n(doneToday.length)+' أنجزت اليوم' : '';
   if(!S.tasks.length){
-    ul.innerHTML = '<li class="empty">ما فيه مهام بعد — <b>اكتب أول مهمة فوق</b> وتطلع هنا. يظهر لك ٣ بس، الباقي يستنى.</li>';
+    ul.innerHTML = '<li class="empty">اكتب أول مهمة فوق.</li>';
   } else if(!open.length){
-    ul.innerHTML = '<li class="empty"><b>خلّصت كل شي.</b> أضف المهمة الجاية أو ارتاح.</li>';
+    ul.innerHTML = '<li class="empty"><b>خلّصت كل شي.</b></li>';
   } else ul.innerHTML = list.map(taskRow).join('');
   var more = document.getElementById('tasks-more');
   more.hidden = open.length<=3;
@@ -520,8 +513,7 @@ function renderToday(){
     '<div class="label">دخل الشهر</div>'+
     '<div class="big num">'+n(inc.expected)+' <small>/ '+n(goal)+'</small></div>'+
     '<div class="bar"><i class="ghost" style="width:'+pExp+'%"></i><i class="fill" data-w="'+pRec+'"></i></div>'+
-    '<div class="sub">'+(inc.received ? 'استلمت '+n(inc.received)+' ر.س' : 'المتوقع من المصادر الثابتة · سجّل أول دفعة مستلمة في الفلوس')+'</div>'+
-    '<div class="sub">باقي '+n(Math.max(0,goal-inc.expected))+' للهدف</div>';
+    '<div class="sub">'+(inc.received ? 'استلمت '+n(inc.received) : 'باقي '+n(Math.max(0,goal-inc.expected)))+'</div>';
 
   // videos
   var vd = videosThisMonth(), vg = +S.settings.videoGoal||20;
@@ -529,19 +521,18 @@ function renderToday(){
     '<div class="label">فيديوهات سلة</div>'+
     '<div class="big num">'+n(vd)+' <small>/ '+n(vg)+'</small></div>'+
     '<div class="bar"><i class="fill" data-w="'+Math.min(100,vd/vg*100)+'"></i></div>'+
-    '<div class="sub">'+(vd ? 'باقي '+n(vg-vd)+' هذا الشهر' : 'ما سلّمت شي هذا الشهر بعد · أضف أول فيديو في خط الإنتاج')+'</div>';
+    '<div class="sub">باقي '+n(Math.max(0,vg-vd))+'</div>';
 
   renderPending();
 
   // daily quote — same all day, changes tomorrow
   var start = new Date(new Date().getFullYear(),0,0), day = Math.floor((new Date()-start)/864e5);
-  document.getElementById('quote').innerHTML = '<p>'+esc(QUOTES[day % QUOTES.length])+'</p><div class="src">تذكير اليوم</div>';
+  document.getElementById('quote').innerHTML = '<p>'+esc(QUOTES[day % QUOTES.length])+'</p>';
 
-  // backup age
-  var lb = S.lastBackup;
-  document.getElementById('backup-age').innerHTML = lb
-    ? 'آخر نسخة: '+shortDate(lb.slice(0,10))+(daysBetween(lb.slice(0,10),t)>7 ? ' — <b style="color:var(--red)">مر عليها أكثر من أسبوع</b>' : '')
-    : 'ما أخذت نسخة بعد — بياناتك موجودة على هذا الجهاز بس';
+  // backup reminder — only shows when it's due (never taken, or older than a week)
+  var lb = S.lastBackup, stale = !lb || daysBetween(lb.slice(0,10),t)>7;
+  document.getElementById('backup').hidden = !stale;
+  document.getElementById('backup-age').textContent = lb ? 'آخر نسخة قبل أكثر من أسبوع' : 'ما أخذت نسخة احتياطية بعد';
 
   // animate bars after paint
   requestAnimationFrame(function(){ requestAnimationFrame(function(){
@@ -600,8 +591,10 @@ function addTask(title){
   // tiny inline parsing: "#سلة" sets project, "!" sets high priority, "اليوم"/"بكرة" sets date
   title = title.replace(/#(\S+)/, function(m,g){ var hit = proj.filter(function(x){return x===g;})[0]; if(hit){p.project=hit; return '';} return m; });
   if(/!\s*$/.test(title) || /^!/.test(title)){ p.priority = 1; title = title.replace(/^!|!\s*$/,''); }
-  if(/\bبكرة\b|\bبكره\b/.test(title)){ var d=new Date(); d.setDate(d.getDate()+1); p.date=dkey(d); title=title.replace(/بكرة|بكره/,''); }
-  else if(/\bاليوم\b/.test(title)){ p.date=dkey(); title=title.replace(/اليوم/,''); }
+  // \b doesn't work with Arabic letters in JS, so match on spaces/edges
+  var TMR = /(^|\s)(بكرة|بكره)(?=\s|$)/, TDY = /(^|\s)اليوم(?=\s|$)/;
+  if(TMR.test(title)){ var d=new Date(); d.setDate(d.getDate()+1); p.date=dkey(d); title=title.replace(TMR,' '); }
+  else if(TDY.test(title)){ p.date=dkey(); title=title.replace(TDY,' '); }
   S.tasks.push({ id:uid(), title:title.replace(/\s+/g,' ').trim(), project:p.project||'', date:p.date||'', priority:p.priority||2,
     note:'', done:false, doneAt:null, repeat:'', order:S.tasks.length, createdAt:new Date().toISOString() });
   save(); renderToday();
@@ -730,7 +723,7 @@ var QUOTES = [
   'رسالة تفاوض وحدة مرسلة أحسن من عشر مسودات.',
   'رد ١–٣٪ على الرسائل الباردة طبيعي. الشغل هو العدد، مو الحظ.',
   'ساعة After Effects اليوم أحسن من خمس ساعات «يوم الجمعة إن شاء الله».',
-  'اسأل السؤال الصعب بدري — الإقامة أهم من أي فيديو.',
+  'اسأل السؤال الصعب بدري — الجواب المتأخر أغلى.',
   'الي عنده الجواب بالأرقام ما يتفاوض من موقف ضعيف.',
   'ما تحتاج حماس، تحتاج تبدأ المهمة الأولى.',
   'خلّص الأصعب قبل الظهر، والباقي يمشي.',
