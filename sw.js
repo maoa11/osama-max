@@ -1,6 +1,6 @@
 // لوحة أسامة — offline cache. Bump VERSION on every deploy so phones pick up the new index.html.
-var VERSION = 'board-v6';
-var CORE = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-192.png', './icon-512.png'];
+var VERSION = 'board-v7';
+var CORE = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-192.png', './icon-512.png', './firebase-config.js'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(VERSION).then(function (c) { return c.addAll(CORE); }).then(function () { return self.skipWaiting(); }));
@@ -26,8 +26,10 @@ self.addEventListener('fetch', function (e) {
     return;
   }
 
-  // Same-origin files + Google Fonts (Tajawal): cache first, fill on first use.
-  if (url.origin === location.origin || /fonts\.(googleapis|gstatic)\.com$/.test(url.hostname)) {
+  // Same-origin files + Google Fonts (Tajawal) + the Firebase SDK files: cache first, fill on first use.
+  // (Firestore / sign-in traffic itself is never cached.)
+  var firebaseSdk = url.hostname === 'www.gstatic.com' && url.pathname.indexOf('/firebasejs/') === 0;
+  if (url.origin === location.origin || /fonts\.(googleapis|gstatic)\.com$/.test(url.hostname) || firebaseSdk) {
     e.respondWith(caches.match(req).then(function (hit) {
       return hit || fetch(req).then(function (res) {
         if (res && (res.ok || res.type === 'opaque')) { var copy = res.clone(); caches.open(VERSION).then(function (c) { c.put(req, copy); }); }

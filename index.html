@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="لوحة أسامة">
+<script src="firebase-config.js"></script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -352,6 +353,13 @@ body.rep-open{overflow:hidden}
   .rpage:last-child{break-after:auto;page-break-after:auto}
 }
 
+/* sign-in screen */
+#gate{position:fixed;inset:0;z-index:80;background:linear-gradient(160deg,var(--mint) 0%,var(--mint-deep) 100%);display:grid;place-items:center;padding:24px}
+.gate-card{background:var(--surface);border-radius:28px;padding:32px 24px;width:100%;max-width:380px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.gate-card img{border-radius:20px;margin-bottom:12px}
+.gate-card h1{font-size:26px;font-weight:800}
+.gate-card p{color:var(--muted);margin:8px 0 22px}
+body.gated{overflow:hidden}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 /* ===== bright additions ===== */
@@ -455,6 +463,7 @@ body.rep-open{overflow:hidden}
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="grip"></div><div id="sheet-body"></div></div>
 <div id="report" hidden><div class="rbar"><button class="btn btn-ghost btn-sm" data-act="rep-close">رجوع</button><span class="sp"></span><button class="btn btn-ghost btn-sm" data-act="rep-copy">نسخ كنص</button><button class="btn btn-mint btn-sm" data-act="rep-print">تحميل PDF</button></div><div id="report-pages"></div></div>
+<div id="gate" hidden><div class="gate-card"><img src="icon-192.png" alt="" width="72" height="72"><h1>لوحة أسامة</h1><p>ادخل بحسابك عشان تنحفظ بياناتك وتلقاها على أي جهاز.</p><button class="btn btn-mint btn-block" data-act="sign-in">الدخول بحساب Google</button></div></div>
 <div class="toast" id="toast"><span id="toast-msg"></span><button id="toast-undo" hidden>تراجع</button></div>
 <input type="file" id="import-file" accept="application/json,.json" hidden>
 
@@ -539,7 +548,11 @@ function seed(){
 var S;
 function load(){
   try { S = JSON.parse(localStorage.getItem(KEY)); } catch(e){ S = null; }
-  if(!S || !S.version){ S = seed(); save(); }
+  if(!S || !S.version){ S = seed(); }
+  migrate(); persist();
+}
+// bring any saved shape (local or from the cloud) up to the current one — never overwrites user values
+function migrate(){
   // removed the residency topic: drop it from data saved by the first release
   if(S.legal){ delete S.legal; S.pending = S.pending.filter(function(p){ return p.text.indexOf('وضع الإقامة')!==0; }); }
   // forward-compat: add any keys a newer seed introduced, never overwrite
@@ -556,9 +569,13 @@ function load(){
   });
   if(!S.paletteV2){ S.settings.theme = 'light'; S.paletteV2 = true; }
   S.sources.forEach(function(src){ var b = base.sources.filter(function(x){return x.id===src.id;})[0]; if(b && !src.note) src.note = b.note; if(src.id==='raghad' && src.kind==='pending') src.active = true; });
-  save();
 }
+// every user change: stamp it, keep it on the device, then mirror it to the account
 function save(){
+  S.updatedAt = Date.now();
+  persist(); schedulePush();
+}
+function persist(){
   try { localStorage.setItem(KEY, JSON.stringify(S)); }
   catch(e){ toast('ما قدرت أحفظ — صدّر نسخة احتياطية'); }
 }
@@ -1539,6 +1556,7 @@ function renderSettings(){
       '<label class="switch"><span>صوت عند الإنجاز</span><input type="checkbox" id="set-sound" '+(s.sound?'checked':'')+'></label>'+
       '<label class="switch"><span>الثيم الغامق</span><input type="checkbox" id="set-theme" '+(s.theme==='dark'?'checked':'')+'></label>'+
       '<div class="note">التنبيه يطلع لما تفتح اللوحة (مرة باليوم): الديدلاينات، الفواتير المتأخرة، والمبالغ المستحقة من عملائك. ما فيه سيرفر يرسل تنبيه وهي مقفلة.</div></div>'+
+    accountCard()+
     '<div class="card"><h2 class="sec"><span>البيانات</span></h2>'+
       '<div class="sub" style="margin:0 0 12px">'+(S.lastBackup?'آخر نسخة: '+shortDate(S.lastBackup.slice(0,10)):'ما أخذت نسخة بعد')+' — بياناتك على هذا الجهاز بس.</div>'+
       '<div class="btns"><button class="btn btn-mint" data-act="export">تصدير نسخة</button><button class="btn btn-line" data-act="import">استيراد</button></div>'+
@@ -1697,7 +1715,7 @@ function importData(file){
       var d = JSON.parse(r.result);
       if(!d || !d.version || !d.settings) throw 0;
       confirmBox('الاستيراد يستبدل كل البيانات الحالية على هذا الجهاز. متأكد؟','استبدل',function(){
-        var prev = JSON.stringify(S); localStorage.setItem(KEY, JSON.stringify(d)); load(); applyTheme(); render();
+        var prev = JSON.stringify(S); localStorage.setItem(KEY, JSON.stringify(d)); load(); save(); applyTheme(); render();
         toast('تم الاستيراد', function(){ S = JSON.parse(prev); save(); applyTheme(); render(); });
       });
     }catch(e){ toast('الملف مو نسخة احتياطية من اللوحة'); }
@@ -1856,6 +1874,8 @@ document.addEventListener('click', function(e){
     case 'rep-close': closeReport(); break;
     case 'rep-print': window.print(); break;
     case 'rep-copy': copy(reportText(byId(S.reports, $('report').dataset.rid))); break;
+    case 'sign-in': signIn(); break;
+    case 'sign-out': signOut(); break;
     case 'export': exportData(); break;
     case 'import': $('import-file').click(); break;
     case 'reset':
@@ -1898,8 +1918,101 @@ var QUOTES = [
   'الريل الإضافي الي ما أحد طلبه هو الي يخليك تنذكر.'
 ];
 
+/* =========================================================
+   الحساب والمزامنة — Google sign-in + Firestore (one doc per user)
+   localStorage stays the instant/offline copy; the cloud is the
+   source of truth across devices. Off until firebase-config.js is filled.
+   ========================================================= */
+var FB_VER = '10.12.2';
+var Cloud = { on:false, user:null, ref:null, unsub:null, synced:false, timer:null, status:'', lastSync:null };
+function cloudConfigured(){ return !!(window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey); }
+function loadScript(src){ return new Promise(function(ok,no){ var s=document.createElement('script'); s.src=src; s.onload=ok; s.onerror=no; document.head.appendChild(s); }); }
+function cloudBoot(){
+  if(!cloudConfigured()) return;
+  Cloud.on = true;
+  var base = 'https://www.gstatic.com/firebasejs/'+FB_VER+'/';
+  loadScript(base+'firebase-app-compat.js')
+    .then(function(){ return Promise.all([loadScript(base+'firebase-auth-compat.js'), loadScript(base+'firebase-firestore-compat.js')]); })
+    .then(function(){
+      firebase.initializeApp(window.FIREBASE_CONFIG);
+      var db = firebase.firestore();
+      try{ db.enablePersistence({ synchronizeTabs:true }).catch(function(){}); }catch(e){}
+      Cloud.db = db;
+      firebase.auth().getRedirectResult().catch(function(e){ gateError(e); });
+      firebase.auth().onAuthStateChanged(function(u){
+        if(Cloud.unsub){ Cloud.unsub(); Cloud.unsub = null; }
+        Cloud.user = u; Cloud.synced = false;
+        if(u){ gate(false); attachCloud(u); } else { gate(true); }
+        if(current==='settings') render();
+      });
+    })
+    .catch(function(){ Cloud.status = 'offline'; if(current==='settings') render(); });   // no internet on a cold start: keep working locally
+}
+function attachCloud(u){
+  Cloud.ref = Cloud.db.collection('boards').doc(u.uid);
+  Cloud.unsub = Cloud.ref.onSnapshot(function(snap){
+    if(snap.metadata.hasPendingWrites) return;
+    if(!snap.exists){ Cloud.synced = true; pushNow(); return; }          // first sign-in ever: upload what this device has
+    var d = snap.data(), remote = +d.updatedAt || 0, mine = +S.updatedAt || 0, base = +S.syncedAt || 0;
+    if(remote === mine){ S.syncedAt = remote; persist(); }
+    else if(remote > base){                                              // another device changed it → take the cloud copy
+      if(mine > base){ try{ localStorage.setItem(KEY+'_local_backup', JSON.stringify(S)); }catch(e){} }
+      try{ var next = JSON.parse(d.data); next.syncedAt = remote; next.updatedAt = remote; S = next; migrate(); persist(); applyTheme(); render(); }catch(e){}
+      if(Cloud.synced) toast('تحدّثت البيانات من حسابك');
+    }
+    else if(mine > base){ Cloud.synced = true; pushNow(); return; }      // only this device changed → upload
+    Cloud.synced = true; Cloud.lastSync = new Date(); Cloud.status = 'ok';
+    if(current==='settings') render();
+  }, function(e){ Cloud.status = 'error'; console.warn(e); if(current==='settings') render(); });
+}
+function schedulePush(){
+  if(!Cloud.user || !Cloud.synced) return;          // never push before the first reconcile — protects newer data on other devices
+  clearTimeout(Cloud.timer); Cloud.timer = setTimeout(pushNow, 1200);
+}
+function pushNow(){
+  if(!Cloud.ref) return;
+  var json = JSON.stringify(S), at = +S.updatedAt || Date.now();
+  if(json.length > 900000){ toast('البيانات كبرت — خفف صور اللوقو'); }
+  Cloud.status = 'saving';
+  Cloud.ref.set({ data:json, updatedAt:at, email:Cloud.user.email||'', device:navigator.userAgent.slice(0,80) })
+    .then(function(){ S.syncedAt = at; persist(); Cloud.status = 'ok'; Cloud.lastSync = new Date(); if(current==='settings') render(); })
+    .catch(function(e){ Cloud.status = 'error'; console.warn(e); if(current==='settings') render(); });
+}
+function signIn(){
+  var p = new firebase.auth.GoogleAuthProvider(); p.setCustomParameters({ prompt:'select_account' });
+  var standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  var go = standalone ? firebase.auth().signInWithRedirect(p) : firebase.auth().signInWithPopup(p);
+  go.catch(function(e){
+    if(/popup|operation-not-supported|web-storage/.test(e.code||'')) return firebase.auth().signInWithRedirect(p);
+    gateError(e);
+  });
+}
+function signOut(){
+  confirmBox('تطلع من حسابك؟ بياناتك تبقى محفوظة في الحساب.','اطلع',function(){ pushNow(); firebase.auth().signOut(); });
+}
+function gate(show){
+  var g = $('gate'); if(!g) return;
+  g.hidden = !show; document.body.classList.toggle('gated', show);
+}
+function gateError(e){
+  var m = { 'auth/unauthorized-domain':'هذا الرابط مو مضاف في Firebase (Authorized domains).', 'auth/network-request-failed':'ما فيه إنترنت.', 'auth/popup-closed-by-user':'' }[e && e.code];
+  if(m===undefined) m = 'ما ضبط الدخول: '+((e && e.code)||'خطأ');
+  if(m) toast(m);
+}
+function accountCard(){
+  if(!cloudConfigured()) return '<div class="card"><h2 class="sec"><span>الحساب</span></h2><div class="sub" style="margin:0">الحفظ في الحساب ما تفعّل بعد — بياناتك على هذا الجهاز بس.</div></div>';
+  var u = Cloud.user;
+  var st = { ok:'محفوظ في حسابك ✓', saving:'يحفظ…', error:'ما قدر يحفظ — بيعيد المحاولة', offline:'بدون إنترنت — يحفظ لما يرجع' }[Cloud.status] || (u?'يتزامن…':'');
+  return '<div class="card"><h2 class="sec"><span>الحساب</span></h2>'+
+    (u ? '<div class="item" style="border:0;padding:0">'+(u.photoURL?'<img src="'+esc(u.photoURL)+'" alt="" style="width:44px;height:44px;border-radius:50%">':'')+
+          '<div class="t"><b>'+esc(u.displayName||'')+'</b><small>'+esc(u.email||'')+'</small></div></div>'+
+          '<div class="note">'+st+(Cloud.lastSync?' · '+Cloud.lastSync.toLocaleTimeString('ar-SA-u-nu-arab',{hour:'numeric',minute:'2-digit'}):'')+'</div>'+
+          '<button class="btn btn-line btn-block" style="margin-top:12px" data-act="sign-out">تسجيل خروج</button>'
+        : '<button class="btn btn-mint btn-block" data-act="sign-in">الدخول بحساب Google</button>')+'</div>';
+}
+
 /* ---------- boot ---------- */
-load(); applyTheme(); buildNav(); route(); checkNotify();
+load(); applyTheme(); buildNav(); route(); checkNotify(); cloudBoot();
 if('serviceWorker' in navigator && location.protocol!=='file:'){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
 </script>
 </body>
