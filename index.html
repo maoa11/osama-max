@@ -1393,7 +1393,6 @@ function reportDoc(r){
   var logo = function(cls){ return b.logo ? '<img class="'+cls+'" src="'+b.logo+'" alt="">' : '<div class="'+cls+' wordmark">'+esc(name)+'</div>'; };
   var types = {}; r.items.forEach(function(i){ types[i.type] = (types[i.type]||0) + num(i.count); });
   var typeList = Object.keys(types).sort(function(a,c){return types[c]-types[a];});
-  var target = r.client==='salla' ? num(S.settings.videoGoal) : 0;
   var pages = [];
   var foot = function(){ return '<footer><span>التقرير الشهري · '+esc(name)+'</span><span class="pg"></span></footer>'; };
   var head = function(title, sub){ return '<header>'+logo('rlogo')+'<div><h2>'+title+'</h2>'+(sub?'<p>'+sub+'</p>':'')+'</div></header>'; };
@@ -1405,12 +1404,10 @@ function reportDoc(r){
     '<div class="ctext"><h1>التقرير الشهري</h1><p>محتوى '+esc(name)+' · '+lat(total)+' '+clipWord(total)+'</p><small>'+month+'</small></div></section>');
 
   // 2. summary
-  var edits = types['مونتاج']||0;
-  var stats = '<div class="rstat big"><b>'+lat(total)+'</b><span>'+clipWord(total)+' هالشهر</span>'+(target?'<em>'+lat(edits)+' فيديو مونتاج من أصل '+lat(target)+'</em>':'')+'</div>'+
+  var stats = '<div class="rstat big"><b>'+lat(total)+'</b><span>'+clipWord(total)+' هالشهر</span>'+'</div>'+
     typeList.slice(0,3).map(function(t){ return '<div class="rstat"><b>'+lat(types[t])+'</b><span>'+esc(t)+'</span></div>'; }).join('');
   pages.push('<section class="rpage">'+head('ملخص الشهر', month+' · إعداد أسامة أنور')+
     '<div class="rstats">'+stats+'</div>'+
-    (target ? '<div class="rprog"><i style="width:'+Math.min(100,edits/target*100)+'%"></i></div>' : '')+
     (r.notes ? '<div class="rbox"><h4>ملاحظات الشهر</h4><p>'+esc(r.notes).replace(/\n/g,'<br>')+'</p></div>' : '')+
     (r.next ? '<div class="rnext"><h4>الخطوة الجاية</h4><p>'+esc(r.next).replace(/\n/g,'<br>')+'</p></div>' : '')+
     foot()+'</section>');
