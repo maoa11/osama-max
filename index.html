@@ -1954,6 +1954,13 @@ function attachCloud(u){
     if(snap.metadata.hasPendingWrites) return;
     if(!snap.exists){ Cloud.synced = true; pushNow(); return; }          // first sign-in ever: upload what this device has
     var d = snap.data(), remote = +d.updatedAt || 0, mine = +S.updatedAt || 0, base = +S.syncedAt || 0;
+    // this device has never synced: don't let an empty board on one side wipe real data on the other
+    if(!base && remote !== mine){
+      var cloudS; try{ cloudS = JSON.parse(d.data); }catch(e){ cloudS = null; }
+      var here = dataScore(S), there = cloudS ? dataScore(cloudS) : 0;
+      if(here && !there){ Cloud.synced = true; S.updatedAt = Date.now(); persist(); pushNow(); return; }
+      if(here && there){ chooseCopy(cloudS, remote); return; }
+    }
     if(remote === mine){ S.syncedAt = remote; persist(); }
     else if(remote > base){                                              // another device changed it → take the cloud copy
       if(mine > base){ try{ localStorage.setItem(KEY+'_local_backup', JSON.stringify(S)); }catch(e){} }
@@ -1964,6 +1971,28 @@ function attachCloud(u){
     Cloud.synced = true; Cloud.lastSync = new Date(); Cloud.status = 'ok';
     if(current==='settings') render();
   }, function(e){ Cloud.status = 'error'; console.warn(e); if(current==='settings') render(); });
+}
+// how much real (user-entered) data a board holds — the first-run seed scores 0
+function dataScore(st){
+  var n = 0;
+  ['tasks','videos','perf','invoices','commissions','incomeLog','reports','learning','monthlyGoals','wins'].forEach(function(k){ n += (st[k]||[]).length; });
+  (st.clients||[]).forEach(function(c){ if(c.id!=='rehama' || (c.pieces||[]).length || num(c.amount)) n++; });
+  return n;
+}
+function chooseCopy(cloudS, remote){
+  var a = dataScore(S), b = dataScore(cloudS);
+  openSheet('<h3>فيه بيانات في حسابك وبيانات في هالجهاز</h3><div class="info">أيها تبي تعتمد؟ الثانية تنحفظ نسخة احتياطية على هالجهاز.</div>'+
+    '<div class="btns" style="flex-direction:column">'+
+    '<button class="btn btn-mint" id="cc-cloud">بيانات الحساب ('+n(b)+' عنصر)</button>'+
+    '<button class="btn btn-ghost" id="cc-here">بيانات هالجهاز ('+n(a)+' عنصر)</button></div>');
+  $('cc-cloud').onclick = function(){
+    try{ localStorage.setItem(KEY+'_local_backup', JSON.stringify(S)); }catch(e){}
+    cloudS.syncedAt = remote; cloudS.updatedAt = remote; S = cloudS; migrate(); persist();
+    Cloud.synced = true; Cloud.status = 'ok'; Cloud.lastSync = new Date(); closeSheet(); applyTheme(); render();
+  };
+  $('cc-here').onclick = function(){
+    S.updatedAt = Date.now(); persist(); Cloud.synced = true; closeSheet(); pushNow();
+  };
 }
 function schedulePush(){
   if(!Cloud.user || !Cloud.synced) return;          // never push before the first reconcile — protects newer data on other devices
