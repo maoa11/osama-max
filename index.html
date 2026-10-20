@@ -265,6 +265,93 @@ h2.sec{font-size:15px;font-weight:700;color:var(--muted);margin:0 0 12px;display
 
 @keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.18)}100%{transform:scale(1)}}
 .pop{animation:pop .3s var(--ease)}
+
+/* ===== reports (editor) ===== */
+.brand-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:4px}
+.brand-dots{display:flex;gap:4px}
+.brand-dots i{width:22px;height:22px;border-radius:7px;border:1px solid var(--line);display:block}
+.brand-logo{height:36px;max-width:120px;object-fit:contain;background:var(--surface2);border-radius:8px;padding:4px}
+.rnum{width:30px;height:30px;border-radius:9px;background:var(--mint-soft);color:var(--mint);display:grid;place-items:center;font-weight:800;font-size:14px;flex-shrink:0}
+.rep-add{margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)}
+.rep-swatch{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;font-weight:800;flex-shrink:0;overflow:hidden}
+.rep-swatch img{width:80%;height:80%;object-fit:contain}
+
+/* ===== report viewer + document ===== */
+#report{position:fixed;inset:0;z-index:70;background:#E6ECEC;overflow:auto;-webkit-overflow-scrolling:touch}
+body.rep-open{overflow:hidden}
+.rbar{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top));
+  background:rgba(255,255,255,.94);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid #d5dede;color:#14261A}
+.rbar .sp{flex:1}
+.rbar .btn-ghost{background:#EEF3F1;color:#14261A}
+#report-pages{padding:12px}
+.rdoc{display:flex;flex-direction:column;gap:12px;align-items:center}
+.rpage{width:1123px;height:794px;flex-shrink:0;background:#fff;position:relative;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);
+  padding:56px 64px;color:var(--d);font-family:"Tajawal",system-ui,sans-serif;direction:rtl;line-height:1.6;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rpage header{display:flex;flex-direction:row-reverse;justify-content:space-between;align-items:flex-start;gap:24px}
+.rpage header h2{font-size:40px;font-weight:800;line-height:1.2}
+.rpage header p{font-size:18px;color:#4E6066;margin-top:6px}
+.rlogo{height:40px;max-width:170px;object-fit:contain}
+.wordmark{font-weight:800;color:var(--d);white-space:nowrap}
+.rlogo.wordmark{height:auto;font-size:26px}
+.rpage footer{position:absolute;bottom:26px;left:64px;right:64px;display:flex;justify-content:space-between;font-size:13px;color:#8A9AA0}
+/* cover */
+.rpage.cover{background:var(--p);padding:0}
+.cover .sh{position:absolute;background:var(--s);display:block}
+.cover .sh1{left:260px;top:0;width:300px;height:310px}
+.cover .sh2{left:150px;top:150px;width:240px;height:220px;border-radius:26px;transform:skewX(-5deg)}
+.cover .sh3{left:-40px;top:360px;width:380px;height:520px;border-radius:220px 220px 0 0}
+.clogo{position:absolute;top:56px;right:64px;height:60px;max-width:240px;object-fit:contain}
+.clogo.wordmark{height:auto;font-size:40px}
+.ctext{position:absolute;right:64px;bottom:96px;left:520px;text-align:right}
+.ctext h1{font-size:76px;font-weight:800;line-height:1.1;color:var(--d)}
+.ctext p{font-size:26px;font-weight:500;margin-top:16px;color:var(--d)}
+.ctext small{display:block;margin-top:30px;font-size:17px;color:var(--d);opacity:.8}
+/* summary */
+.rstats{display:flex;gap:16px;margin-top:44px}
+.rstat{flex:1;background:var(--s);border-radius:22px;padding:24px 26px;min-width:0}
+.rstat b{display:block;font-size:56px;font-weight:800;line-height:1}
+.rstat span{display:block;font-size:19px;font-weight:700;margin-top:10px}
+.rstat em{display:block;font-style:normal;font-size:15px;margin-top:2px;opacity:.85}
+.rstat.big{background:var(--d);color:#fff;flex:1.3}
+.rstat.big em{color:var(--p);opacity:1}
+.rprog{height:12px;background:#EDF3F2;border-radius:99px;margin-top:18px;overflow:hidden;position:relative}
+.rprog i{position:absolute;right:0;top:0;bottom:0;background:var(--p);border-radius:99px}
+.rbox{background:var(--d);color:#fff;border-radius:22px;padding:22px 28px;margin-top:26px}
+.rbox h4,.rnext h4{font-size:15px;font-weight:700;margin-bottom:6px}
+.rbox h4{color:var(--p)}
+.rbox p{font-size:19px;line-height:1.8;max-height:140px;overflow:hidden}
+.rnext{border:2px solid var(--p);border-radius:22px;padding:16px 28px;margin-top:16px}
+.rnext p{font-size:18px;max-height:62px;overflow:hidden}
+/* details */
+.ritems{margin-top:30px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ritem{display:flex;gap:16px;align-items:flex-start;background:#F5F9F8;border-radius:20px;padding:20px 22px;height:168px;overflow:hidden}
+.rbadge{width:46px;height:46px;border-radius:13px;background:var(--d);color:var(--p);display:grid;place-items:center;font-weight:800;font-size:21px;flex-shrink:0}
+.rbody{flex:1;min-width:0}
+.rtop{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.rchip{background:var(--s);color:var(--d);font-size:13px;font-weight:700;padding:2px 12px;border-radius:999px}
+.rtop b{font-size:21px;font-weight:800;line-height:1.35}
+.rbody p{font-size:15px;color:#4E6066;margin-top:6px;line-height:1.6}
+.rcount{background:var(--a);color:var(--d);font-weight:800;font-size:24px;border-radius:12px;padding:4px 14px;white-space:nowrap;flex-shrink:0}
+.rcount small{font-size:13px;font-weight:700}
+/* video list */
+.rvlist{margin-top:30px;columns:3;column-gap:32px;list-style:none;counter-reset:v var(--start,0)}
+.rvlist li{break-inside:avoid;display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #E4ECEA;font-size:16px}
+.rvlist li::before{counter-increment:v;content:counter(v);width:28px;height:28px;border-radius:8px;background:var(--s);color:var(--d);font-weight:800;font-size:13px;display:grid;place-items:center;flex-shrink:0}
+.rvlist li b{flex:1;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rvlist li span{color:#8A9AA0;font-size:13px}
+@media print{
+  @page{size:A4 landscape;margin:0}
+  html,body{background:#fff!important}
+  body.rep-open>*:not(#report){display:none!important}
+  #report{position:static;overflow:visible;background:#fff}
+  .rbar{display:none!important}
+  #report-pages{padding:0}
+  .rdoc{gap:0;display:block}
+  .rpage{box-shadow:none;zoom:1!important;break-after:page;page-break-after:always;margin:0}
+  .rpage:last-child{break-after:auto;page-break-after:auto}
+}
+
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 /* ===== bright additions ===== */
@@ -357,6 +444,7 @@ h2.sec{font-size:15px;font-weight:700;color:var(--muted);margin:0 0 12px;display
     <section class="view" id="v-perf"></section>
     <section class="view" id="v-money"></section>
     <section class="view" id="v-clients"></section>
+    <section class="view" id="v-reports"></section>
     <section class="view" id="v-goals"></section>
     <section class="view" id="v-settings"></section>
   </main>
@@ -366,6 +454,7 @@ h2.sec{font-size:15px;font-weight:700;color:var(--muted);margin:0 0 12px;display
 
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="grip"></div><div id="sheet-body"></div></div>
+<div id="report" hidden><div class="rbar"><button class="btn btn-ghost btn-sm" data-act="rep-close">رجوع</button><span class="sp"></span><button class="btn btn-ghost btn-sm" data-act="rep-copy">نسخ كنص</button><button class="btn btn-mint btn-sm" data-act="rep-print">تحميل PDF</button></div><div id="report-pages"></div></div>
 <div class="toast" id="toast"><span id="toast-msg"></span><button id="toast-undo" hidden>تراجع</button></div>
 <input type="file" id="import-file" accept="application/json,.json" hidden>
 
@@ -440,6 +529,8 @@ function seed(){
       ]
     },
     learning: [], monthlyGoals: [], wins: [],
+    reports: [],
+    brands: { salla: { logo:'', primary:'#2EF2C9', soft:'#AEFCE5', dark:'#004855', accent:'#FDE68A' } },
     brand: { mint:'#B2F1DC', aqua:'#B2F1F1', teal:'#004855', size:'1080×1920 · 30fps', font:'Tajawal', audio:'-14 LUFS · True Peak -1 dBTP' },
     doneDays: []
   };
@@ -493,6 +584,7 @@ var I = {
   money:'<rect x="2.5" y="6" width="19" height="13" rx="2.5"/><circle cx="12" cy="12.5" r="2.5"/><path d="M6 6V4.5h12V6"/>',
   phone:'<path d="M5 3.5h3.5l1.5 4.5-2.2 1.4a11 11 0 0 0 5.8 5.8l1.4-2.2 4.5 1.5V18a2.5 2.5 0 0 1-2.5 2.5A16 16 0 0 1 2.5 6 2.5 2.5 0 0 1 5 3.5z"/>',
   clients:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20c0-2.6-1.5-4.6-3.7-5.5"/>',
+  report:'<path d="M6 2.5h8.5L19 7v13.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-17a1 1 0 0 1 1-1z"/><path d="M14 2.5V7h5M8.5 17v-3M12 17v-6M15.5 17v-4.5"/>',
   goals:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/>',
   settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   more:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
@@ -511,6 +603,7 @@ var ROUTES = [
   { id:'salla',    label:'سلة',       icon:'salla',    tab:true },
   { id:'tasks',    label:'المهام',    icon:'tasks' },
   { id:'perf',     label:'الأداء',    icon:'perf' },
+  { id:'reports',  label:'التقارير',  icon:'report' },
   { id:'goals',    label:'الأهداف',   icon:'goals' },
   { id:'settings', label:'الإعدادات', icon:'settings' }
 ];
@@ -553,7 +646,7 @@ function hdr(title, btn){ return '<div class="hdr"><h1 class="page-title">'+titl
 function seg(name, opts, val){
   return '<div class="seg">'+opts.map(function(o){ return '<button data-seg="'+name+'" data-v="'+o[0]+'" class="'+(o[0]===val?'on':'')+'">'+o[1]+'</button>'; }).join('')+'</div>';
 }
-var UI = { taskView:'today', taskProj:'', moneyTab:'month', goalTab:'plan', clientView:'all' };
+var UI = { taskView:'today', taskProj:'', moneyTab:'month', goalTab:'plan', clientView:'all', reportId:null };
 
 /* ---------- derived numbers ---------- */
 function sourceById(id){ return byId(S.sources,id); }
@@ -786,7 +879,7 @@ function renderSalla(){
   timed.forEach(function(v){ var w = weekStart(v.deliveredAt.slice(0,10)); (weeks[w]=weeks[w]||[]).push(num(v.hours)); });
   var pts = Object.keys(weeks).sort().slice(-8).map(function(w){ var a=weeks[w]; return { label:shortDate(w), v:a.reduce(function(x,y){return x+y;},0)/a.length }; });
 
-  $('v-salla').innerHTML = hdr('سلة','<button class="btn btn-mint btn-sm" data-act="video-add">+ فيديو</button>')+
+  $('v-salla').innerHTML = hdr('سلة','<div class="btns"><button class="btn btn-ghost btn-sm" data-act="rep-salla">التقرير الشهري</button><button class="btn btn-mint btn-sm" data-act="video-add">+ فيديو</button></div>')+
     '<div class="card"><div class="label">سلّمت هذا الشهر</div><div class="big num">'+n(delivered.length)+' <small>/ '+n(goal)+'</small></div>'+bar(delivered.length/goal*100)+
     '<div class="stats" style="margin-top:16px">'+
       '<div class="stat"><b class="num">'+(avg?nd(avg):'—')+'</b><span>متوسط الساعات</span></div>'+
@@ -1124,7 +1217,8 @@ function clientSheet(id){
     '<h2 class="sec" style="margin-top:20px"><span>السجل</span></h2><ul class="list">'+
       (hist.length ? hist.map(function(h){ return '<li class="item" data-hk="'+h.k+'" data-hid="'+h.id+'"><div class="t"><b>'+esc(h.t)+'</b><small>'+shortDate(h.d)+'</small></div><button class="x" data-act="client-hist-del" data-cid2="'+c.id+'" aria-label="حذف">'+ico('x')+'</button></li>'; }).join('')
         : '<li class="empty">ما فيه دفعات بعد.</li>')+'</ul>'+
-    '<div class="btns" style="margin-top:16px"><button class="btn btn-line" data-act="client-del" data-cid2="'+c.id+'">حذف</button><button class="btn btn-ghost" data-act="client-edit" data-cid2="'+c.id+'">تعديل</button></div>');
+    '<button class="btn btn-ghost btn-block" style="margin-top:16px" data-act="rep-client" data-cid2="'+c.id+'">تقرير شهري لهالعميل</button>'+
+    '<div class="btns" style="margin-top:10px"><button class="btn btn-line" data-act="client-del" data-cid2="'+c.id+'">حذف</button><button class="btn btn-ghost" data-act="client-edit" data-cid2="'+c.id+'">تعديل</button></div>');
 }
 function clientEditSheet(id){
   var c = id ? byId(S.clients,id) : { name:'', sector:'', phone:'', billing:'monthly', amount:'', start:dkey(), active:true, note:'' };
@@ -1169,6 +1263,205 @@ function clientPieceSheet(id){
 }
 function uniq(a){ var o={}, r=[]; a.forEach(function(x){ if(x && !o[x]){ o[x]=1; r.push(x); } }); return r; }
 
+
+/* =========================================================
+   التقارير الشهرية — report per client per month, printed as a
+   landscape PDF in the client's own identity (logo + colors).
+   ========================================================= */
+var WORK_TYPES = ['مونتاج','تصوير','موشن جرافيك','تصميم','تعليق صوتي','تعديلات','أخرى'];
+var DEFAULT_BRAND = { logo:'', primary:'#16A34A', soft:'#DCFCE7', dark:'#14532D', accent:'#FDE68A' };
+function reportClients(){ return [['salla','سلة']].concat(S.clients.map(function(c){return [c.id,c.name];})); }
+function reportClientName(key){ if(key==='salla') return 'سلة'; var c = byId(S.clients,key); return c ? c.name : '—'; }
+function brandOf(key){ var b = S.brands[key]; if(!b){ b = S.brands[key] = Object.assign({}, DEFAULT_BRAND); } return b; }
+function monthLong(mk){ var p=mk.split('-'); return new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn',{month:'long',year:'numeric'}).format(new Date(+p[0],p[1]-1,1)); }
+// Arabic counting: 1 مقطع · 2 مقطعين · 3–10 مقاطع · 11+ مقطع
+function clipWord(x){ x = Math.round(num(x)); return x===2 ? 'مقطعين' : (x>=3 && x<=10) ? 'مقاطع' : 'مقطع'; }
+function reportTotal(r){ return r.items.reduce(function(a,i){return a+num(i.count);},0); }
+function lat(x){ return new Intl.NumberFormat('en-US').format(Math.round(x||0)); }   // report uses Western digits like the client's own decks
+
+function renderReports(){
+  var r = UI.reportId && byId(S.reports, UI.reportId);
+  if(!r){ UI.reportId = null; return renderReportList(); }
+  var b = brandOf(r.client), isSalla = r.client==='salla';
+  var mkVideos = isSalla ? videosIn(r.month) : [];
+  $('v-reports').innerHTML =
+    '<div class="hdr"><h1 class="page-title" style="font-size:24px">تقرير '+esc(reportClientName(r.client))+'</h1><button class="btn btn-ghost btn-sm" data-act="rep-back">رجوع</button></div>'+
+    '<div class="card"><div class="row">'+
+      fld('العميل','<select id="rep-client">'+reportClients().map(function(c){return '<option value="'+c[0]+'"'+(c[0]===r.client?' selected':'')+'>'+esc(c[1])+'</option>';}).join('')+'</select>')+
+      fld('الشهر','<input type="month" id="rep-month" value="'+r.month+'">')+'</div>'+
+      '<div class="brand-row"><div class="brand-dots">'+['primary','soft','dark','accent'].map(function(k){return '<i style="background:'+b[k]+'"></i>';}).join('')+'</div>'+
+        (b.logo?'<img src="'+b.logo+'" alt="" class="brand-logo">':'<span class="sub" style="margin:0">بدون لوقو</span>')+
+        '<button class="btn btn-ghost btn-sm" data-act="rep-brand">هوية العميل</button></div></div>'+
+    '<div class="card"><h2 class="sec"><span>وش سويت هالشهر</span><span class="num">'+n(reportTotal(r))+' مقطع</span></h2>'+
+      '<ul class="list">'+(r.items.length ? r.items.map(function(it,i){
+        return '<li class="item" data-rit="'+it.id+'"><span class="rnum">'+n(i+1)+'</span><div class="t" data-act="rep-item-edit"><b>'+esc(it.title||it.type)+'</b><small>'+esc(it.type)+(it.note?' · '+esc(it.note):'')+'</small></div>'+
+          '<span class="chip sun num">× '+n(it.count)+'</span><button class="x" data-act="rep-item-del" aria-label="حذف">'+ico('x')+'</button></li>';
+      }).join('') : '<li class="empty">أضف الشغل: النوع، عدد المقاطع، وملاحظة.</li>')+'</ul>'+
+      '<form id="rep-add" class="rep-add">'+
+        '<div class="row">'+fld('النوع',sel('type',WORK_TYPES.map(function(t){return [t,t];}),'مونتاج'))+fld('عدد المقاطع','<input name="count" inputmode="decimal" value="1" required>')+'</div>'+
+        fld('العنوان (اختياري)','<input name="title" placeholder="مثلاً ريلز ديوانية سلة">')+
+        fld('ملاحظة (اختياري)','<input name="note" placeholder="مثلاً ٩:١٦ مع سبتايتل">')+
+        '<button class="btn btn-mint btn-block">+ أضف للتقرير</button></form>'+
+      (isSalla && mkVideos.length ? '<button class="btn btn-line btn-block" style="margin-top:10px" data-act="rep-import">استيراد '+n(mkVideos.length)+' فيديو مسلّم من خط الإنتاج</button>' : '')+
+    '</div>'+
+    '<div class="card">'+fld('ملاحظات الشهر (تطلع في التقرير)','<textarea id="rep-notes" placeholder="مثلاً: سلّمنا كل الفيديوهات في وقتها، وجربنا هوك الرقم في ٥ مقاطع…">'+esc(r.notes)+'</textarea>')+
+      fld('الخطوة الجاية (اختياري)','<textarea id="rep-next" style="min-height:70px" placeholder="مثلاً: نجرب قالب «قيّم متجري» الشهر الجاي">'+esc(r.next)+'</textarea>')+
+      (r.videoList && r.videoList.length ? '<label class="switch"><span>أرفق قائمة الفيديوهات ('+n(r.videoList.length)+')</span><input type="checkbox" id="rep-vlist" '+(r.showList!==false?'checked':'')+'></label>' : '')+
+    '</div>'+
+    '<button class="btn btn-mint btn-block" style="min-height:56px;font-size:18px" data-act="rep-preview">معاينة وتحميل PDF</button>'+
+    '<button class="btn btn-block" style="margin-top:8px;color:var(--red)" data-act="rep-del">حذف التقرير</button>';
+  $('rep-client').onchange = function(){ r.client = this.value; save(); render(); };
+  $('rep-month').onchange = function(){ if(this.value){ r.month = this.value; save(); render(); } };
+  $('rep-notes').onchange = function(){ r.notes = this.value; save(); };
+  $('rep-next').onchange = function(){ r.next = this.value; save(); };
+  if($('rep-vlist')) $('rep-vlist').onchange = function(){ r.showList = this.checked; save(); };
+  $('rep-add').onsubmit = function(e){
+    e.preventDefault(); var f = formData(this);
+    r.items.push({ id:uid(), type:f.type, title:f.title.trim(), count:num(f.count)||1, note:f.note.trim() });
+    save(); render(); toast('انضاف');
+  };
+}
+function renderReportList(){
+  var list = S.reports.slice().sort(function(a,b){ return b.month<a.month?-1:b.month>a.month?1:(b.createdAt||0)-(a.createdAt||0); });
+  $('v-reports').innerHTML = hdr('التقارير','<button class="btn btn-mint" data-act="rep-new">+ تقرير</button>')+
+    (list.length ? '<div class="cgrid">'+list.map(function(r){
+      var b = brandOf(r.client);
+      return '<div class="card client" data-rid="'+r.id+'"><div class="client-top" data-act="rep-open">'+
+        '<span class="rep-swatch" style="background:'+b.primary+';color:'+b.dark+'">'+(b.logo?'<img src="'+b.logo+'" alt="">':esc(reportClientName(r.client).slice(0,2)))+'</span>'+
+        '<div class="t"><b>'+esc(reportClientName(r.client))+'</b><small>'+monthLong(r.month)+'</small></div>'+
+        '<div class="end"><span class="num">'+n(reportTotal(r))+' مقطع</span></div></div>'+
+        '<div class="btns" style="margin-top:12px"><button class="btn btn-ghost btn-sm" data-act="rep-open">تعديل</button><button class="btn btn-mint btn-sm" data-act="rep-preview">PDF</button></div></div>';
+    }).join('')+'</div>'
+    : '<div class="card"><div class="empty">سوّ أول تقرير شهري: اختر العميل والشهر، أضف وش سويت وعدد المقاطع، ويطلع لك ملف مرتب بهوية العميل.</div></div>');
+}
+function newReport(client, month){
+  client = client || 'salla'; month = month || mkey(new Date());
+  var r = S.reports.filter(function(x){return x.client===client && x.month===month;})[0];
+  if(!r){ r = { id:uid(), client:client, month:month, items:[], notes:'', next:'', createdAt:Date.now() }; S.reports.push(r); save(); }
+  UI.reportId = r.id; if(current!=='reports') location.hash = 'reports'; else render();
+}
+function importSallaVideos(r){
+  var vids = videosIn(r.month); if(!vids.length) return;
+  var it = r.items.filter(function(i){return i.fromLine;})[0];
+  if(!it){ it = { id:uid(), type:'مونتاج', title:'ريلز «ديوانية سلة» — مقابلات تجار 9:16', note:'', fromLine:true }; r.items.unshift(it); }
+  it.count = vids.length;
+  r.videoList = vids.slice().sort(function(a,b){return (a.deliveredAt||'')<(b.deliveredAt||'')?-1:1;}).map(function(v){ return { name:v.name, date:(v.deliveredAt||'').slice(0,10) }; });
+  r.showList = true; save(); render(); toast('انضاف '+n(vids.length)+' فيديو');
+}
+function brandSheet(key){
+  var b = brandOf(key);
+  var col = function(k,label){ return '<div class="field"><label>'+label+'</label><input type="color" name="'+k+'" value="'+b[k]+'" style="padding:4px;height:48px"></div>'; };
+  openSheet('<h3>هوية '+esc(reportClientName(key))+'</h3><form id="bf">'+
+    '<div class="field"><label>اللوقو (صورة PNG أو JPG)</label><div class="brand-row" style="margin:0">'+
+      (b.logo?'<img src="'+b.logo+'" alt="" class="brand-logo" id="bf-prev">':'<span class="sub" id="bf-prev" style="margin:0">ما فيه لوقو</span>')+
+      '<label class="btn btn-ghost btn-sm" style="cursor:pointer">رفع صورة<input type="file" accept="image/*" id="bf-file" hidden></label>'+
+      (b.logo?'<button type="button" class="btn btn-line btn-sm" id="bf-rm">إزالة</button>':'')+'</div></div>'+
+    '<div class="row">'+col('primary','اللون الأساسي')+col('soft','لون فاتح')+'</div>'+
+    '<div class="row">'+col('dark','لون غامق (العناوين)')+col('accent','لون التمييز')+'</div>'+
+    '<button class="btn btn-mint btn-block">حفظ</button></form>');
+  var logo = b.logo;
+  $('bf-file').onchange = function(){
+    var f = this.files[0]; if(!f) return;
+    shrinkImage(f, 480, function(url){ logo = url; var p = $('bf-prev'); p.outerHTML = '<img src="'+url+'" alt="" class="brand-logo" id="bf-prev">'; });
+  };
+  if($('bf-rm')) $('bf-rm').onclick = function(){ logo = ''; $('bf-prev').outerHTML = '<span class="sub" id="bf-prev" style="margin:0">ما فيه لوقو</span>'; };
+  $('bf').onsubmit = function(e){
+    e.preventDefault(); var f = formData(this);
+    b.logo = logo; ['primary','soft','dark','accent'].forEach(function(k){ b[k] = f[k]; });
+    save(); closeSheet(); render(); toast('انحفظت الهوية');
+  };
+}
+// keep logos small so localStorage doesn't fill up
+function shrinkImage(file, max, cb){
+  var fr = new FileReader();
+  fr.onload = function(){
+    var img = new Image();
+    img.onload = function(){
+      var k = Math.min(1, max/Math.max(img.width,img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width*k); c.height = Math.round(img.height*k);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      cb(c.toDataURL('image/png'));
+    };
+    img.src = fr.result;
+  };
+  fr.readAsDataURL(file);
+}
+
+/* ---------- the document itself (A4 landscape pages) ---------- */
+function reportDoc(r){
+  var b = brandOf(r.client), name = reportClientName(r.client), month = monthLong(r.month), total = reportTotal(r);
+  var logo = function(cls){ return b.logo ? '<img class="'+cls+'" src="'+b.logo+'" alt="">' : '<div class="'+cls+' wordmark">'+esc(name)+'</div>'; };
+  var types = {}; r.items.forEach(function(i){ types[i.type] = (types[i.type]||0) + num(i.count); });
+  var typeList = Object.keys(types).sort(function(a,c){return types[c]-types[a];});
+  var target = r.client==='salla' ? num(S.settings.videoGoal) : 0;
+  var pages = [];
+  var foot = function(){ return '<footer><span>التقرير الشهري · '+esc(name)+'</span><span class="pg"></span></footer>'; };
+  var head = function(title, sub){ return '<header>'+logo('rlogo')+'<div><h2>'+title+'</h2>'+(sub?'<p>'+sub+'</p>':'')+'</div></header>'; };
+
+  // 1. cover
+  pages.push('<section class="rpage cover">'+
+    '<i class="sh sh1"></i><i class="sh sh2"></i><i class="sh sh3"></i>'+
+    logo('clogo')+
+    '<div class="ctext"><h1>التقرير الشهري</h1><p>محتوى '+esc(name)+' · '+lat(total)+' '+clipWord(total)+'</p><small>'+month+'</small></div></section>');
+
+  // 2. summary
+  var edits = types['مونتاج']||0;
+  var stats = '<div class="rstat big"><b>'+lat(total)+'</b><span>'+clipWord(total)+' هالشهر</span>'+(target?'<em>'+lat(edits)+' فيديو مونتاج من أصل '+lat(target)+'</em>':'')+'</div>'+
+    typeList.slice(0,3).map(function(t){ return '<div class="rstat"><b>'+lat(types[t])+'</b><span>'+esc(t)+'</span></div>'; }).join('');
+  pages.push('<section class="rpage">'+head('ملخص الشهر', month+' · إعداد أسامة أنور')+
+    '<div class="rstats">'+stats+'</div>'+
+    (target ? '<div class="rprog"><i style="width:'+Math.min(100,edits/target*100)+'%"></i></div>' : '')+
+    (r.notes ? '<div class="rbox"><h4>ملاحظات الشهر</h4><p>'+esc(r.notes).replace(/\n/g,'<br>')+'</p></div>' : '')+
+    (r.next ? '<div class="rnext"><h4>الخطوة الجاية</h4><p>'+esc(r.next).replace(/\n/g,'<br>')+'</p></div>' : '')+
+    foot()+'</section>');
+
+  // 3. details — 6 rows per page
+  for(var i=0; i<r.items.length; i+=6){
+    pages.push('<section class="rpage">'+head('تفاصيل الشغل', i? 'تابع':'كل اللي انسلّم هالشهر')+'<div class="ritems">'+
+      r.items.slice(i,i+6).map(function(it,j){
+        return '<div class="ritem"><span class="rbadge">'+(i+j+1)+'</span><div class="rbody"><div class="rtop"><span class="rchip">'+esc(it.type)+'</span><b>'+esc(it.title||it.type)+'</b></div>'+
+          (it.note?'<p>'+esc(it.note)+'</p>':'')+'</div><span class="rcount">'+lat(it.count)+' <small>'+clipWord(it.count)+'</small></span></div>';
+      }).join('')+'</div>'+foot()+'</section>');
+  }
+
+  // 4. optional delivered-videos list — 3 columns × 8 rows per page
+  if(r.videoList && r.videoList.length && r.showList!==false){
+    for(var k=0; k<r.videoList.length; k+=24){
+      pages.push('<section class="rpage">'+head('قائمة الفيديوهات المسلّمة', lat(r.videoList.length)+' فيديو · '+month)+'<ol class="rvlist" style="--start:'+k+'">'+
+        r.videoList.slice(k,k+24).map(function(v){ return '<li><b>'+esc(v.name)+'</b>'+(v.date?'<span>'+v.date.slice(8,10)+'/'+v.date.slice(5,7)+'</span>':'')+'</li>'; }).join('')+
+        '</ol>'+foot()+'</section>');
+    }
+  }
+  var N = pages.length;
+  pages = pages.map(function(p,i){ return p.replace('<span class="pg"></span>','<span class="pg">'+(i+1)+' / '+N+'</span>'); });
+  return '<div class="rdoc" style="--p:'+b.primary+';--s:'+b.soft+';--d:'+b.dark+';--a:'+b.accent+'">'+pages.join('')+'</div>';
+}
+function openReport(id){
+  var r = byId(S.reports,id); if(!r) return;
+  if(!r.items.length){ toast('أضف شغل للتقرير أول'); return; }
+  $('report-pages').innerHTML = reportDoc(r);
+  $('report').dataset.rid = r.id;
+  $('report').hidden = false; document.body.classList.add('rep-open');
+  document.title = 'تقرير '+reportClientName(r.client)+' — '+monthLong(r.month);   // becomes the PDF file name
+  fitReport();
+}
+// plain-text version for WhatsApp
+function reportText(r){
+  var lines = ['التقرير الشهري — '+reportClientName(r.client), monthLong(r.month), '', 'المجموع: '+lat(reportTotal(r))+' '+clipWord(reportTotal(r)), ''];
+  r.items.forEach(function(it,i){ lines.push((i+1)+'. '+(it.title||it.type)+' ('+it.type+') — '+lat(it.count)+(it.note?' · '+it.note:'')); });
+  if(r.notes) lines.push('', 'ملاحظات الشهر:', r.notes);
+  if(r.next) lines.push('', 'الخطوة الجاية:', r.next);
+  lines.push('', '— أسامة أنور');
+  return lines.join('\n');
+}
+function closeReport(){ $('report').hidden = true; document.body.classList.remove('rep-open'); document.title = 'لوحة أسامة'; }
+function fitReport(){
+  var w = Math.min(window.innerWidth - 24, 1123), k = w/1123;
+  document.querySelectorAll('#report .rpage').forEach(function(p){ p.style.zoom = k; });
+}
+window.addEventListener('resize', function(){ if(!$('report').hidden) fitReport(); });
+window.addEventListener('beforeprint', function(){ document.querySelectorAll('#report .rpage').forEach(function(p){ p.style.zoom = ''; }); });
+window.addEventListener('afterprint', function(){ if(!$('report').hidden) fitReport(); });
 
 /* =========================================================
    الأهداف والتعلّم
@@ -1541,6 +1834,31 @@ document.addEventListener('click', function(e){
     case 'win-del': removeWithUndo(S.wins, li.dataset.wid, 'الإنجاز'); break;
     case 'src-add': sourceSheet(); break;
     case 'src-edit': sourceSheet(li.dataset.src); break;
+    case 'rep-new': newReport('salla'); break;
+    case 'rep-salla': newReport('salla'); break;
+    case 'rep-client': closeSheet(); newReport(cid()); break;
+    case 'rep-open': UI.reportId = b.closest('[data-rid]').dataset.rid; render(); window.scrollTo(0,0); break;
+    case 'rep-back': UI.reportId = null; render(); break;
+    case 'rep-brand': brandSheet(byId(S.reports,UI.reportId).client); break;
+    case 'rep-import': importSallaVideos(byId(S.reports,UI.reportId)); break;
+    case 'rep-item-del':
+      var rr = byId(S.reports,UI.reportId), ri = rr.items.findIndex(function(x){return x.id===li.dataset.rit;}), ritem = rr.items.splice(ri,1)[0];
+      save(); render(); toast('انحذف', function(){ rr.items.splice(ri,0,ritem); save(); render(); }); break;
+    case 'rep-item-edit':
+      var re = byId(S.reports,UI.reportId), it2 = byId(re.items, li.dataset.rit);
+      simpleSheet('تعديل', '<div class="row">'+fld('النوع',sel('type',WORK_TYPES.map(function(t){return [t,t];}),it2.type))+fld('عدد المقاطع','<input name="count" inputmode="decimal" required value="'+esc(it2.count)+'">')+'</div>'+
+        fld('العنوان','<input name="title" value="'+esc(it2.title)+'">')+fld('ملاحظة','<input name="note" value="'+esc(it2.note)+'">'),
+        function(f){ it2.type=f.type; it2.count=num(f.count)||1; it2.title=f.title.trim(); it2.note=f.note.trim(); }); break;
+    case 'rep-preview': openReport(UI.reportId && current==='reports' && !b.closest('[data-rid]') ? UI.reportId : b.closest('[data-rid]').dataset.rid); break;
+    case 'rep-del':
+      var rd = byId(S.reports,UI.reportId);
+      confirmBox('تحذف تقرير '+reportClientName(rd.client)+' — '+monthLong(rd.month)+'؟','احذف',function(){
+        var i = S.reports.indexOf(rd); S.reports.splice(i,1); UI.reportId = null; save(); render();
+        toast('انحذف', function(){ S.reports.splice(i,0,rd); save(); render(); });
+      }); break;
+    case 'rep-close': closeReport(); break;
+    case 'rep-print': window.print(); break;
+    case 'rep-copy': copy(reportText(byId(S.reports, $('report').dataset.rid))); break;
     case 'export': exportData(); break;
     case 'import': $('import-file').click(); break;
     case 'reset':
@@ -1553,11 +1871,11 @@ document.addEventListener('click', function(e){
 $('tasks-more').onclick = function(){ showAllToday = !showAllToday; renderToday(); };
 $('scrim').onclick = closeSheet;
 $('import-file').onchange = function(){ if(this.files[0]) importData(this.files[0]); this.value=''; };
-document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSheet(); });
+document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ if($('sheet').classList.contains('on')) closeSheet(); else if(!$('report').hidden) closeReport(); } });
 window.addEventListener('hashchange', route);
 document.addEventListener('visibilitychange', function(){ if(!document.hidden && !$('sheet').classList.contains('on')){ render(); checkNotify(); } });
 
-var VIEWS = { today:renderToday, tasks:renderTasks, salla:renderSalla, perf:renderPerf, money:renderMoney, clients:renderClients, goals:renderGoals, settings:renderSettings };
+var VIEWS = { today:renderToday, tasks:renderTasks, salla:renderSalla, perf:renderPerf, money:renderMoney, clients:renderClients, reports:renderReports, goals:renderGoals, settings:renderSettings };
 
 /* ---------- daily reminders: honest, not empty hype ---------- */
 var QUOTES = [

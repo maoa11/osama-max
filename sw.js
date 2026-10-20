@@ -1,5 +1,5 @@
 // لوحة أسامة — offline cache. Bump VERSION on every deploy so phones pick up the new index.html.
-var VERSION = 'board-v4';
+var VERSION = 'board-v5';
 var CORE = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', function (e) {
