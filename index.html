@@ -295,7 +295,7 @@ body.rep-open{overflow:hidden}
 .rlogo{height:40px;max-width:170px;object-fit:contain}
 .wordmark{font-weight:800;color:var(--d);white-space:nowrap}
 .rlogo.wordmark{height:auto;font-size:26px}
-.rpage footer{position:absolute;bottom:26px;left:64px;right:64px;display:flex;justify-content:space-between;font-size:13px;color:#8A9AA0}
+.rpage footer{position:absolute;bottom:26px;left:64px;right:64px;display:flex;justify-content:space-between;font-size:13px;color:#8A9AA0;white-space:nowrap}
 /* cover */
 .rpage.cover{background:var(--p);padding:0}
 .cover .sh{position:absolute;background:var(--s);display:block}
@@ -1469,6 +1469,60 @@ function reportText(r){
   return lines.join('\n');
 }
 function closeReport(){ $('report').hidden = true; document.body.classList.remove('rep-open'); document.title = 'لوحة أسامة'; }
+// Direct PDF download: each page is rendered by the browser itself (SVG snapshot keeps Arabic
+// shaping and the Tajawal font exact), then packed into an A4-landscape PDF. Libraries load on first use.
+var PDF_LIBS = ['https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js','https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js'];
+function pdfLibs(){
+  if(window.htmlToImage && window.jspdf) return Promise.resolve();
+  return PDF_LIBS.reduce(function(p,src){ return p.then(function(){ return loadScript(src); }); }, Promise.resolve());
+}
+// the snapshot can't read the cross-origin Google Fonts sheet, so inline Tajawal as data URLs once
+var _fontCSS = null;
+function tajawalCSS(){
+  if(_fontCSS) return Promise.resolve(_fontCSS);
+  var href = (document.querySelector('link[href*="fonts.googleapis.com/css2"]')||{}).href;
+  if(!href) return Promise.resolve('');
+  return fetch(href).then(function(r){ return r.text(); }).then(function(css){
+    var urls = css.match(/url\((https:[^)]+)\)/g) || [];
+    return Promise.all(urls.map(function(u){
+      var src = u.slice(4,-1);
+      return fetch(src).then(function(r){ return r.blob(); }).then(function(b){
+        return new Promise(function(ok){ var fr = new FileReader(); fr.onload = function(){ ok([src, fr.result]); }; fr.readAsDataURL(b); });
+      });
+    })).then(function(pairs){ pairs.forEach(function(p){ css = css.split(p[0]).join(p[1]); }); _fontCSS = css; return css; });
+  }).catch(function(){ return ''; });
+}
+function downloadReportPdf(btn){
+  var r = byId(S.reports, $('report').dataset.rid); if(!r) return;
+  var label = btn.textContent; btn.disabled = true; btn.textContent = 'يجهز الملف…';
+  var pages = [].slice.call(document.querySelectorAll('#report .rpage'));
+  var name = 'تقرير '+reportClientName(r.client)+' - '+monthLong(r.month)+'.pdf';
+  var done = function(){ btn.disabled = false; btn.textContent = label; fitReport(); };
+  var fontCSS = '';
+  pdfLibs().then(function(){ return document.fonts ? document.fonts.ready : null; }).then(tajawalCSS).then(function(css){
+    fontCSS = css;
+    pages.forEach(function(p){ p.style.zoom = ''; });
+    var pdf = new window.jspdf.jsPDF({ orientation:'landscape', unit:'px', format:[1123,794], hotfixes:['px_scaling'], compress:true });
+    return pages.reduce(function(chain, p, i){
+      return chain.then(function(){
+        return htmlToImage.toJpeg(p, { quality:.92, pixelRatio:2, width:1123, height:794, backgroundColor:'#ffffff', fontEmbedCSS:fontCSS || undefined, style:{ zoom:'1', boxShadow:'none', margin:'0' } });
+      }).then(function(img){ if(i) pdf.addPage([1123,794],'landscape'); pdf.addImage(img,'JPEG',0,0,1123,794); });
+    }, Promise.resolve()).then(function(){ return pdf; });
+  }).then(function(pdf){
+    var blob = pdf.output('blob'), file = null;
+    try{ file = new File([blob], name, { type:'application/pdf' }); }catch(e){}
+    // phones: share sheet (save to Files / send on WhatsApp); computers: normal download
+    if(file && navigator.canShare && navigator.canShare({ files:[file] }) && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)){
+      return navigator.share({ files:[file], title:name }).catch(function(e){ if(e && e.name!=='AbortError') saveBlob(blob,name); });
+    }
+    saveBlob(blob, name);
+  }).then(function(){ done(); toast('تم تجهيز الـPDF'); })
+  .catch(function(e){ console.warn(e); done(); toast('ما قدر يجهز الملف — تأكد من الإنترنت أول مرة'); });
+}
+function saveBlob(blob, name){
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+}
 function fitReport(){
   var w = Math.min(window.innerWidth - 24, 1123), k = w/1123;
   document.querySelectorAll('#report .rpage').forEach(function(p){ p.style.zoom = k; });
@@ -1872,7 +1926,7 @@ document.addEventListener('click', function(e){
         toast('انحذف', function(){ S.reports.splice(i,0,rd); save(); render(); });
       }); break;
     case 'rep-close': closeReport(); break;
-    case 'rep-print': window.print(); break;
+    case 'rep-print': downloadReportPdf(b); break;
     case 'rep-copy': copy(reportText(byId(S.reports, $('report').dataset.rid))); break;
     case 'sign-in': signIn(); break;
     case 'sign-out': signOut(); break;
