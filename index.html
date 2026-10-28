@@ -353,6 +353,15 @@ body.rep-open{overflow:hidden}
   .rpage:last-child{break-after:auto;page-break-after:auto}
 }
 
+/* money lock */
+.lock{text-align:center;padding:36px 22px;max-width:420px;margin:0 auto}
+.lock-ico{font-size:40px;margin-bottom:8px}
+.lock h3{font-size:22px;font-weight:800}
+.lock form{margin-top:18px}
+.lock input{width:100%;min-height:56px;text-align:center;font-size:28px;letter-spacing:12px;background:var(--surface2);border:1px solid transparent;border-radius:var(--r-sm);margin-bottom:12px;outline:none}
+.lock input:focus{border-color:var(--mint-mid)}
+@keyframes shake{0%,100%{transform:none}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.shake{animation:shake .3s var(--ease)}
 /* sign-in screen */
 #gate{position:fixed;inset:0;z-index:80;background:linear-gradient(160deg,var(--mint) 0%,var(--mint-deep) 100%);display:grid;place-items:center;padding:24px}
 .gate-card{background:var(--surface);border-radius:28px;padding:32px 24px;width:100%;max-width:380px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.2)}
@@ -751,9 +760,10 @@ function renderToday(){
   var inc = monthIncome(), goal = num(S.settings.incomeGoal)||1;
   $('income-card').innerHTML =
     '<div class="label">دخل الشهر</div>'+
+    (moneyLocked() ? '<div class="big num">🔒 ••••</div><div class="sub">اضغط واكتب الرمز</div>' :
     '<div class="big num">'+n(inc.expected)+' <small>/ '+n(goal)+'</small></div>'+
     bar(inc.received/goal*100, inc.expected/goal*100)+
-    '<div class="sub">'+(inc.received ? 'استلمت '+n(inc.received) : 'باقي '+n(Math.max(0,goal-inc.expected)))+'</div>';
+    '<div class="sub">'+(inc.received ? 'استلمت '+n(inc.received) : 'باقي '+n(Math.max(0,goal-inc.expected)))+'</div>');
 
   var vd = videosIn(mkey(new Date())).length, vg = num(S.settings.videoGoal)||20;
   $('videos-card').innerHTML =
@@ -764,7 +774,7 @@ function renderToday(){
 
   var owed = S.clients.reduce(function(a,c){return a+clientLeft(c);},0), oc = $('owed-card');
   oc.hidden = !owed;
-  if(owed) oc.innerHTML = '<div class="label">مستحق لك من عملائك</div><div class="big num" style="font-size:32px">'+n(owed)+' <small>ريال</small></div><div class="sub">اضغط وسجّل الدفعات</div>';
+  if(owed) oc.innerHTML = '<div class="label">مستحق لك من عملائك</div><div class="big num" style="font-size:32px">'+(moneyLocked()?'🔒 ••••':n(owed)+' <small>ريال</small>')+'</div><div class="sub">اضغط وسجّل الدفعات</div>';
   renderPending();
 
   var start = new Date(new Date().getFullYear(),0,0), day = Math.floor((new Date()-start)/864e5);
@@ -901,7 +911,7 @@ function renderSalla(){
     '<div class="stats" style="margin-top:16px">'+
       '<div class="stat"><b class="num">'+(avg?nd(avg):'—')+'</b><span>متوسط الساعات</span></div>'+
       '<div class="stat"><b class="num">'+nd(num(S.settings.timeGoal))+'</b><span>الهدف (ساعة)</span></div>'+
-      '<div class="stat"><b class="num">'+n(price)+'</b><span>ريال للفيديو</span></div></div></div>'+
+      '<div class="stat"><b class="num">'+money(price)+'</b><span>ريال للفيديو</span></div></div></div>'+
     '<div class="card"><h2 class="sec"><span>الوقت للفيديو — أسبوع بأسبوع</span></h2>'+
       (pts.length>=2 ? lineChart(pts,{goal:num(S.settings.timeGoal),unit:'س'}) : '<div class="empty">سجّل الساعات عند تسليم الفيديوهات — الرسم يطلع بعد أسبوعين من البيانات.</div>')+'</div>'+
     '<div class="card"><h2 class="sec"><span>الفيديوهات</span></h2><ul class="list">'+
@@ -1011,11 +1021,43 @@ function perfSheet(id){
   if(id) $('pf-del').onclick = function(){ removeWithUndo(S.perf, id, 'الفيديو'); };
 }
 
+/* ---------- قفل الفلوس: privacy screen in front of money pages/amounts ----------
+   (a screen lock for the phone, not encryption — the account itself is protected by Google sign-in) */
+var DEFAULT_PIN = '2007', moneyOpenUntil = 0, hiddenAt = 0;
+function moneyLocked(){ return Date.now() > moneyOpenUntil; }
+function money(x){ return moneyLocked() ? '••••' : n(x); }
+function pinHash(p){
+  if(!(window.crypto && crypto.subtle)) return Promise.resolve('plain:'+p);
+  return crypto.subtle.digest('SHA-256', new TextEncoder().encode('osama-board:'+p)).then(function(b){
+    return Array.prototype.map.call(new Uint8Array(b), function(x){ return ('0'+x.toString(16)).slice(-2); }).join('');
+  });
+}
+function checkPin(p){ return S.settings.moneyPinHash ? pinHash(p).then(function(h){ return h===S.settings.moneyPinHash; }) : Promise.resolve(p===DEFAULT_PIN); }
+function toEnDigits(v){ return String(v==null?'':v).replace(/[٠-٩]/g,function(c){return c.charCodeAt(0)-1632;}); }
+function lockScreen(title){
+  return hdr(title)+'<div class="card lock"><div class="lock-ico">🔒</div><h3>الفلوس محمية</h3><p class="sub">اكتب الرمز عشان تفتح</p>'+
+    '<form id="pin-f"><input id="pin-in" type="password" inputmode="numeric" autocomplete="off" maxlength="12" aria-label="الرمز">'+
+    '<button class="btn btn-mint btn-block">فتح</button></form></div>';
+}
+function wireLock(){
+  var f = $('pin-f'); if(!f) return;
+  setTimeout(function(){ var i = $('pin-in'); if(i) i.focus(); }, 250);
+  f.onsubmit = function(e){
+    e.preventDefault();
+    checkPin(toEnDigits($('pin-in').value)).then(function(ok){
+      if(ok){ moneyOpenUntil = Date.now() + 30*60*1000; render(); }
+      else { f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake'); $('pin-in').value=''; toast('الرمز غلط'); }
+    });
+  };
+}
+function lockBtn(){ return '<button class="btn btn-ghost btn-sm" data-act="money-lock" aria-label="قفل">🔒 قفل</button>'; }
+
 /* =========================================================
    الفلوس
    ========================================================= */
 function renderMoney(){
-  var tab = UI.moneyTab, html = hdr('الفلوس') + seg('moneyTab',[['month','الشهر'],['invoices','الفواتير'],['com','العمولات'],['tools','حاسبة']],tab);
+  if(moneyLocked()){ $('v-money').innerHTML = lockScreen('الفلوس'); wireLock(); return; }
+  var tab = UI.moneyTab, html = hdr('الفلوس', lockBtn()) + seg('moneyTab',[['month','الشهر'],['invoices','الفواتير'],['com','العمولات'],['tools','حاسبة']],tab);
   var t = dkey(), mk = mkey(new Date()), goal = num(S.settings.incomeGoal)||1;
   if(tab==='month'){
     var inc = monthIncome(mk);
@@ -1186,13 +1228,14 @@ function clientDue(c){
 }
 function clientLeft(c){ return Math.max(0, clientDue(c) - clientPaid(c)); }
 function renderClients(){
+  if(moneyLocked()){ $('v-clients').innerHTML = lockScreen('عملائي'); wireLock(); return; }
   var C = S.clients, mk = mkey(new Date()), v = UI.clientView;
   var owed = C.reduce(function(a,c){return a+clientLeft(c);},0);
   var monthly = C.filter(function(c){return c.billing==='monthly' && c.active!==false;}).reduce(function(a,c){return a+num(c.amount);},0);
   var gotMonth = S.incomeLog.filter(function(p){return byId(C,p.source) && (p.date||'').slice(0,7)===mk;}).reduce(function(a,p){return a+num(p.amount);},0);
   var list = C.filter(function(c){return v==='all' || c.billing===v;})
     .sort(function(a,b){ return clientLeft(b)-clientLeft(a) || (b.createdAt||0)-(a.createdAt||0); });
-  $('v-clients').innerHTML = hdr('عملائي','<button class="btn btn-mint" data-act="client-add">+ عميل</button>')+
+  $('v-clients').innerHTML = hdr('عملائي','<div class="btns">'+lockBtn()+'<button class="btn btn-mint" data-act="client-add">+ عميل</button></div>')+
     '<div class="card hero-sun"><div class="label">مستحق لك من العملاء</div><div class="big num">'+n(owed)+' <small>ريال</small></div>'+
       '<div class="stats" style="margin-top:16px">'+
       '<div class="stat"><b class="num">'+n(C.length)+'</b><span>عميل</span></div>'+
@@ -1327,8 +1370,8 @@ function renderReports(){
     '</div>'+
     '<button class="btn btn-mint btn-block" style="min-height:56px;font-size:18px" data-act="rep-preview">معاينة وتحميل PDF</button>'+
     '<button class="btn btn-block" style="margin-top:8px;color:var(--red)" data-act="rep-del">حذف التقرير</button>';
-  $('rep-client').onchange = function(){ r.client = this.value; save(); render(); };
-  $('rep-month').onchange = function(){ if(this.value){ r.month = this.value; save(); render(); } };
+  $('rep-client').onchange = function(){ switchReport(r, this.value, r.month); };
+  $('rep-month').onchange = function(){ if(this.value) switchReport(r, r.client, this.value); };
   $('rep-notes').onchange = function(){ r.notes = this.value; save(); };
   $('rep-next').onchange = function(){ r.next = this.value; save(); };
   if($('rep-vlist')) $('rep-vlist').onchange = function(){ r.showList = this.checked; save(); };
@@ -1350,6 +1393,24 @@ function renderReportList(){
         '<div class="btns" style="margin-top:12px"><button class="btn btn-ghost btn-sm" data-act="rep-open">تعديل</button><button class="btn btn-mint btn-sm" data-act="rep-preview">PDF</button></div></div>';
     }).join('')+'</div>'
     : '<div class="card"><div class="empty">سوّ أول تقرير شهري: اختر العميل والشهر، أضف وش سويت وعدد المقاطع، ويطلع لك ملف مرتب بهوية العميل.</div></div>');
+}
+// each client has its own report per month — switching opens that one (or offers to move these items there)
+function switchReport(r, client, month){
+  if(client===r.client && month===r.month) return;
+  var other = S.reports.filter(function(x){ return x.client===client && x.month===month; })[0];
+  var label = reportClientName(client)+' — '+monthLong(month);
+  if(!r.items.length && !r.notes && !r.next){                       // empty draft: just retarget it, or jump to the existing one
+    if(other){ S.reports.splice(S.reports.indexOf(r),1); UI.reportId = other.id; } else { r.client = client; r.month = month; }
+    save(); render(); return;
+  }
+  if(other){ UI.reportId = other.id; render(); toast('فتحت تقرير '+label); return; }
+  openSheet('<h3>تقرير '+esc(label)+'</h3><div class="info">هالتقرير فيه '+n(r.items.length)+' بند. وش تبي؟</div><div class="btns" style="flex-direction:column">'+
+    '<button class="btn btn-mint" id="sw-new">افتح تقرير جديد لـ'+esc(reportClientName(client))+'</button>'+
+    '<button class="btn btn-ghost" id="sw-move">انقل البنود الحالية له</button>'+
+    '<button class="btn btn-line" id="sw-cancel">إلغاء</button></div>');
+  $('sw-new').onclick = function(){ closeSheet(); newReport(client, month); };
+  $('sw-move').onclick = function(){ r.client = client; r.month = month; if(client!=='salla'){ r.videoList = null; } save(); closeSheet(); render(); toast('انتقل التقرير لـ'+reportClientName(client)); };
+  $('sw-cancel').onclick = function(){ closeSheet(); render(); };
 }
 function newReport(client, month){
   client = client || 'salla'; month = month || mkey(new Date());
@@ -1600,11 +1661,13 @@ function renderSettings(){
   var s = S.settings, notifOk = 'Notification' in window;
   $('v-settings').innerHTML = hdr('الإعدادات')+
     '<div class="card"><h2 class="sec"><span>الأساسيات</span></h2><form id="set-main">'+
-      '<div class="row">'+fld('اسمي','<input name="name" value="'+esc(s.name)+'">')+fld('هدف الدخل الشهري','<input name="incomeGoal" inputmode="decimal" value="'+esc(s.incomeGoal)+'">')+'</div>'+
+      '<div class="row">'+fld('اسمي','<input name="name" value="'+esc(s.name)+'">')+(moneyLocked()?'':fld('هدف الدخل الشهري','<input name="incomeGoal" inputmode="decimal" value="'+esc(s.incomeGoal)+'">'))+'</div>'+
       '<div class="row">'+fld('فيديوهات سلة بالشهر','<input name="videoGoal" inputmode="decimal" value="'+esc(s.videoGoal)+'">')+fld('هدف الوقت للفيديو (ساعة)','<input name="timeGoal" inputmode="decimal" value="'+esc(s.timeGoal)+'">')+'</div>'+
       fld('المشاريع (افصل بفاصلة)','<input name="projects" value="'+esc(s.projects.join('، '))+'">')+'</form></div>'+
+    (moneyLocked() ? '<div class="card"><h2 class="sec"><span>مصادر الدخل والرمز</span></h2><div class="sub" style="margin:0 0 12px">مقفلة — افتح الفلوس عشان تعدّلها.</div><a class="btn btn-ghost btn-block" href="#money">🔒 فتح</a></div>' :
+    '<div class="card"><h2 class="sec"><span>رمز الفلوس</span><button class="btn btn-ghost btn-sm" data-act="pin-change">تغيير الرمز</button></h2><div class="sub" style="margin:0">الفلوس وعملائي تنفتح بالرمز، وتنقفل لحالها بعد ٣٠ دقيقة أو لما تطلع من التطبيق.</div></div>'+
     '<div class="card"><h2 class="sec"><span>مصادر الدخل</span><button class="btn btn-ghost btn-sm" data-act="src-add">+ مصدر</button></h2><ul class="list">'+
-      S.sources.map(function(x){ return '<li class="item" data-src="'+x.id+'"><div class="t" data-act="src-edit"><b>'+esc(x.name)+'</b><small>'+(KINDS.filter(function(k){return k[0]===x.kind;})[0]||['',''])[1]+(x.active?'':' · موقوف')+'</small></div><div class="end num">'+(num(x.amount)?n(x.amount):'—')+'</div></li>'; }).join('')+'</ul></div>'+
+      S.sources.map(function(x){ return '<li class="item" data-src="'+x.id+'"><div class="t" data-act="src-edit"><b>'+esc(x.name)+'</b><small>'+(KINDS.filter(function(k){return k[0]===x.kind;})[0]||['',''])[1]+(x.active?'':' · موقوف')+'</small></div><div class="end num">'+(num(x.amount)?n(x.amount):'—')+'</div></li>'; }).join('')+'</ul></div>')+
     '<div class="card">'+
       '<label class="switch"><span>التنبيهات'+(notifOk?'':' (الجهاز ما يدعمها)')+'</span><input type="checkbox" id="set-notify" '+(s.notify?'checked':'')+(notifOk?'':' disabled')+'></label>'+
       '<label class="switch"><span>صوت عند الإنجاز</span><input type="checkbox" id="set-sound" '+(s.sound?'checked':'')+'></label>'+
@@ -1618,7 +1681,7 @@ function renderSettings(){
   var form = $('set-main');
   form.onchange = function(){
     var f = formData(form);
-    s.name = f.name.trim()||'أسامة'; s.incomeGoal = num(f.incomeGoal)||15000; s.videoGoal = num(f.videoGoal)||20; s.timeGoal = num(f.timeGoal)||2;
+    s.name = f.name.trim()||'أسامة'; if('incomeGoal' in f) s.incomeGoal = num(f.incomeGoal)||15000; s.videoGoal = num(f.videoGoal)||20; s.timeGoal = num(f.timeGoal)||2;
     s.projects = f.projects.split(/[,،]/).map(function(x){return x.trim();}).filter(Boolean);
     save(); toast('انحفظ');
   };
@@ -1663,7 +1726,7 @@ function checkNotify(){
   var late = S.tasks.filter(function(x){return !x.done && x.date && x.date<t;}).length, due = S.tasks.filter(function(x){return !x.done && x.date===t;}).length;
   if(due) parts.push(n(due)+' مهمة اليوم'); if(late) parts.push(n(late)+' متأخرة');
   var li = lateInvoices().length; if(li) parts.push(n(li)+' فاتورة متأخرة');
-  var owed = S.clients.reduce(function(a,c){return a+clientLeft(c);},0); if(owed) parts.push(n(owed)+' ريال مستحق من العملاء');
+  var owed = S.clients.reduce(function(a,c){return a+clientLeft(c);},0); if(owed) parts.push('فيه مبالغ مستحقة من العملاء');
   S.lastNotify = t; save();
   if(!parts.length) return;
   var body = parts.join(' · ');
@@ -1928,6 +1991,15 @@ document.addEventListener('click', function(e){
     case 'rep-close': closeReport(); break;
     case 'rep-print': downloadReportPdf(b); break;
     case 'rep-copy': copy(reportText(byId(S.reports, $('report').dataset.rid))); break;
+    case 'money-lock': moneyOpenUntil = 0; render(); toast('انقفلت'); break;
+    case 'pin-change':
+      simpleSheet('تغيير رمز الفلوس', fld('الرمز الحالي','<input name="old" type="password" inputmode="numeric" required>')+fld('الرمز الجديد (٤ أرقام أو أكثر)','<input name="neu" type="password" inputmode="numeric" minlength="4" required>'),
+        function(f){
+          checkPin(toEnDigits(f.old)).then(function(ok){
+            if(!ok){ toast('الرمز الحالي غلط'); return; }
+            pinHash(toEnDigits(f.neu)).then(function(h){ S.settings.moneyPinHash = h; save(); toast('تغيّر الرمز'); });
+          });
+        }); break;
     case 'sign-in': signIn(); break;
     case 'sign-out': signOut(); break;
     case 'export': exportData(); break;
@@ -1944,7 +2016,11 @@ $('scrim').onclick = closeSheet;
 $('import-file').onchange = function(){ if(this.files[0]) importData(this.files[0]); this.value=''; };
 document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ if($('sheet').classList.contains('on')) closeSheet(); else if(!$('report').hidden) closeReport(); } });
 window.addEventListener('hashchange', route);
-document.addEventListener('visibilitychange', function(){ if(!document.hidden && !$('sheet').classList.contains('on')){ render(); checkNotify(); } });
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden){ hiddenAt = Date.now(); return; }
+  if(hiddenAt && Date.now()-hiddenAt > 2*60*1000) moneyOpenUntil = 0;
+  if(!$('sheet').classList.contains('on')){ render(); checkNotify(); }
+});
 
 var VIEWS = { today:renderToday, tasks:renderTasks, salla:renderSalla, perf:renderPerf, money:renderMoney, clients:renderClients, reports:renderReports, goals:renderGoals, settings:renderSettings };
 
