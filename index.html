@@ -1354,14 +1354,21 @@ function viewerUrl(r, it){
 /* ---------- Google Drive upload (drive.file scope: the app only sees files it created) ---------- */
 var Drive = { token:null, exp:0 };
 function driveReady(){ return Drive.token && Date.now() < Drive.exp; }
-function driveAuth(){   // must run inside a tap (opens Google's window)
+var DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+var DRIVE_API_PAGE = 'https://console.cloud.google.com/apis/library/drive.googleapis.com?project='+((window.FIREBASE_CONFIG||{}).projectId||'');
+function driveAuth(forceConsent){   // must run inside a tap (opens Google's window)
   var p = new firebase.auth.GoogleAuthProvider();
-  p.addScope('https://www.googleapis.com/auth/drive.file');
-  if(Cloud.user && Cloud.user.email) p.setCustomParameters({ login_hint:Cloud.user.email });
+  p.addScope(DRIVE_SCOPE);
+  var params = {}; if(Cloud.user && Cloud.user.email) params.login_hint = Cloud.user.email; if(forceConsent) params.prompt = 'consent';
+  p.setCustomParameters(params);
   return firebase.auth().currentUser.reauthenticateWithPopup(p).then(function(res){
-    Drive.token = res.credential && res.credential.accessToken; Drive.exp = Date.now() + 50*60*1000;
-    if(!Drive.token) throw new Error('no-token');
-    return Drive.token;
+    var tok = res.credential && res.credential.accessToken;
+    if(!tok){ var e0 = new Error('no-token'); e0.code = 'no-token'; throw e0; }
+    // Google shows Drive as a checkbox — confirm it was granted before trying to upload
+    return fetch('https://oauth2.googleapis.com/tokeninfo?access_token='+encodeURIComponent(tok)).then(function(r){ return r.json(); }).then(function(info){
+      if(info && info.scope && info.scope.indexOf(DRIVE_SCOPE) < 0){ var e = new Error('no-drive-scope'); e.code = 'no-drive-scope'; throw e; }
+      Drive.token = tok; Drive.exp = Date.now() + 50*60*1000; return tok;
+    }, function(){ Drive.token = tok; Drive.exp = Date.now() + 50*60*1000; return tok; });
   });
 }
 function driveFetch(url, opt){
@@ -1448,23 +1455,36 @@ function attachVideos(rid, itemId){
       '<button class="btn btn-mint btn-block" id="dr-go">متابعة مع Google</button>');
     var go = $('dr-go');
     if(go) go.onclick = function(){ go.disabled = true; go.textContent = 'ينتظر Google…';
-      driveAuth().then(runUpload).catch(function(e){ console.warn(e); closeSheet(); toast(driveErr(e)); }); };
+      driveAuth().then(runUpload).catch(function(e){ console.warn(e); var job = pendingUpload; driveErrSheet(driveErr(e), function(){ pendingUpload = job; runUpload(); }); }); };
   };
   inp.click();
 }
 function driveErr(e){
-  var c = (e && (e.code||'')) + ' ' + (e && e.body || '');
-  if(/popup-blocked|popup-closed|cancelled-popup/.test(c)) return 'انقفلت نافذة Google — جرّب مرة ثانية';
-  if(/accessNotConfigured|SERVICE_DISABLED|has not been used/.test(c)) return 'لازم تفعّل Google Drive API في مشروع Firebase (مرة وحدة)';
-  if(e && e.status===401){ Drive.token = null; return 'انتهت صلاحية الربط — اضغط مرة ثانية'; }
-  if(e && e.status===403) return 'Google رفض الرفع — تأكد من تفعيل Drive API';
-  if(e && e.message==='network') return 'انقطع النت أثناء الرفع';
-  return 'ما ضبط الرفع';
+  var body = (e && e.body) || '', code = (e && e.code) || '', reason = '', msg = '';
+  try{ var j = JSON.parse(body); msg = j.error && j.error.message || ''; reason = (j.error && (j.error.status || (j.error.errors && j.error.errors[0] && j.error.errors[0].reason))) || ''; }catch(x){}
+  var all = code+' '+reason+' '+msg+' '+body;
+  if(/no-drive-scope|insufficientPermissions|ACCESS_TOKEN_SCOPE_INSUFFICIENT|insufficient authentication scopes/i.test(all)){ Drive.token = null; return { k:'scope', t:'ما انعطت صلاحية Drive — في نافذة Google علّم على المربع الخاص بـ Google Drive' }; }
+  if(/accessNotConfigured|SERVICE_DISABLED|has not been used|is disabled/i.test(all)) return { k:'api', t:'Google Drive API مو مفعّل في مشروعك' };
+  if(/popup-blocked/.test(all)) return { k:'popup', t:'المتصفح منع نافذة Google — اسمح بالنوافذ المنبثقة وجرّب' };
+  if(/popup-closed|cancelled-popup/.test(all)) return { k:'popup', t:'انقفلت نافذة Google قبل ما تكمل' };
+  if(/user-mismatch/.test(all)) return { k:'acct', t:'اخترت حساب Google غير الي داخل فيه اللوحة' };
+  if(e && e.status===401){ Drive.token = null; return { k:'auth', t:'انتهت صلاحية الربط — جرّب مرة ثانية' }; }
+  if(e && e.message==='network') return { k:'net', t:'انقطع النت أثناء الرفع' };
+  return { k:'other', t:'ما ضبط الرفع'+(msg||e&&e.status ? ' ('+(e&&e.status||'')+' '+msg+')' : (code?' ('+code+')':'')) };
+}
+function driveErrSheet(err, retry){
+  openSheet('<h3>ما انرفع الفيديو</h3><div class="info">'+esc(err.t)+'</div>'+
+    (err.k==='api' ? '<a class="btn btn-mint btn-block" href="'+DRIVE_API_PAGE+'" target="_blank" rel="noopener">افتح صفحة التفعيل واضغط Enable</a><div class="sub">بعد التفعيل انتظر دقيقة وجرّب مرة ثانية.</div>' : '')+
+    (err.k==='scope' ? '<button class="btn btn-mint btn-block" id="dr-again">أعطِ الصلاحية وكمّل</button>' : '')+
+    '<button class="btn btn-line btn-block" style="margin-top:8px" onclick="closeSheet()">تمام</button>');
+  var again = $('dr-again');
+  if(again) again.onclick = function(){ again.disabled = true; again.textContent = 'ينتظر Google…';
+    driveAuth(true).then(retry).catch(function(e){ console.warn(e); driveErrSheet(driveErr(e), retry); }); };
 }
 function runUpload(){
   var job = pendingUpload; if(!job) return; pendingUpload = null;
   var r = byId(S.reports, job.rid), it = r && byId(r.items, job.itemId); if(!it) return;
-  var total = job.files.length, i = 0, okN = 0, saved = 0, lock = null;
+  var total = job.files.length, i = 0, okN = 0, saved = 0, lock = null, fails = [];
   try{ if(navigator.wakeLock) navigator.wakeLock.request('screen').then(function(l){ lock = l; }).catch(function(){}); }catch(e){}
   var paint = function(phase, p){
     openSheet('<h3>'+(phase==='zip'?'يضغط':'يرفع')+' الفيديو '+n(i+1)+' من '+n(total)+'</h3><div class="info" dir="ltr" style="text-align:left">'+esc(job.files[i].name)+'</div>'+
@@ -1475,8 +1495,12 @@ function runUpload(){
   var step = function(){
     if(i >= total){
       if(lock) lock.release().catch(function(){});
-      closeSheet(); render();
-      toast((okN===total ? 'انرفع '+n(okN)+' فيديو ✓' : 'انرفع '+n(okN)+' من '+n(total)) + (saved>1048576 ? ' · وفّرت '+n(saved/1048576)+' ميجا' : ''));
+      render();
+      if(!fails.length){ closeSheet(); toast('انرفع '+n(okN)+' فيديو ✓'+(saved>1048576 ? ' · وفّرت '+n(saved/1048576)+' ميجا' : '')); return; }
+      // keep the failed files so «جرّب مرة ثانية» re-sends only those
+      var retryFiles = fails.map(function(f){ return f.file; });
+      if(okN) toast('انرفع '+n(okN)+' من '+n(total));
+      driveErrSheet(fails[fails.length-1].err, function(){ pendingUpload = { rid:job.rid, itemId:job.itemId, files:retryFiles }; runUpload(); });
       return;
     }
     var orig = job.files[i], seq = itemVideos(it).length + 1; paint('zip', 0);
@@ -1493,7 +1517,7 @@ function runUpload(){
         (it.videos = it.videos || []).push({ id:id, name:name, size:file.size, orig:orig.size, w:dims.w, h:dims.h, at:Date.now() });
         okN++; save();
       });
-    }).catch(function(e){ console.warn(e); toast(driveErr(e)); })
+    }).catch(function(e){ console.warn(e); fails.push({ file:orig, err:driveErr(e) }); })
       .then(function(){ i++; step(); });
   };
   step();
