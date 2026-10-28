@@ -32,7 +32,8 @@ h1{font-size:26px;font-weight:800;line-height:1.35;margin-top:8px}
 .frame{position:relative;width:100%;border-radius:14px;overflow:hidden;background:var(--d)}
 .frame.l{aspect-ratio:16/9}
 .frame.p{aspect-ratio:9/16;max-width:420px;margin:0 auto}
-.frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.frame iframe,.frame video{position:absolute;inset:0;width:100%;height:100%;border:0}
+.frame video{object-fit:contain;background:#000}
 .cap{display:flex;align-items:center;gap:10px;padding:10px 6px 2px;font-weight:700}
 .num{width:30px;height:30px;border-radius:9px;background:var(--d);color:var(--p);display:grid;place-items:center;font-size:14px;flex-shrink:0}
 .cap a{margin-inline-start:auto;font-size:13px;color:var(--d);opacity:.7}
@@ -69,12 +70,25 @@ footer{text-align:center;font-size:13px;color:#7A8C90;padding:10px 16px 28px}
   document.title = (d.t || 'الفيديو') + ' — ' + (d.c || '');
   var box = document.getElementById('vids');
   if(d.v.length > 1) box.classList.add('many');
+  // Native player first (one clean set of controls on iPhone/Android); if the phone can't stream
+  // the file directly (e.g. Drive still processing a very large one), fall back to Drive's own player.
+  function drivePlayer(frame, id, i){
+    frame.innerHTML = '<iframe src="https://drive.google.com/file/d/'+id+'/preview" allow="autoplay; fullscreen" allowfullscreen loading="lazy" title="فيديو '+(i+1)+'"></iframe>';
+  }
   d.v.forEach(function(v, i){
     var id = String(v[0]||'').replace(/[^\w-]/g,''); if(!id) return;
     var card = document.createElement('div'); card.className = 'vid';
-    card.innerHTML = '<div class="frame '+(v[1]==='p'?'p':'l')+'"><iframe src="https://drive.google.com/file/d/'+id+'/preview" allow="autoplay; fullscreen" allowfullscreen loading="lazy" title="فيديو '+(i+1)+'"></iframe></div>'+
-      '<div class="cap"><span class="num">'+(i+1)+'</span><span>فيديو '+(i+1)+'</span><a href="https://drive.google.com/file/d/'+id+'/view" target="_blank" rel="noopener">فتح بحجم كامل</a></div>';
+    card.innerHTML = '<div class="frame '+(v[1]==='p'?'p':'l')+'"></div>'+
+      '<div class="cap"><span class="num">'+(i+1)+'</span><span>فيديو '+(i+1)+'</span><a href="https://drive.google.com/file/d/'+id+'/view" target="_blank" rel="noopener">فتح في Drive</a></div>';
     box.appendChild(card);
+    var frame = card.querySelector('.frame'), vid = document.createElement('video'), settled = false;
+    vid.controls = true; vid.playsInline = true; vid.setAttribute('playsinline',''); vid.preload = 'metadata';
+    vid.poster = 'https://drive.google.com/thumbnail?id='+id+'&sz=w1080';
+    var fallback = function(){ if(settled) return; settled = true; drivePlayer(frame, id, i); };
+    vid.addEventListener('loadedmetadata', function(){ settled = true; });
+    vid.addEventListener('error', fallback);   // (no timeout: iPhones don't load anything until play is tapped)
+    vid.src = 'https://drive.usercontent.google.com/download?id='+id+'&export=download&confirm=t';
+    frame.appendChild(vid);
   });
   document.getElementById('page').hidden = false;
 })();
