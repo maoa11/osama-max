@@ -1,5 +1,5 @@
 // لوحة أسامة — offline cache. Bump VERSION on every deploy so phones pick up the new index.html.
-var VERSION = 'board-v11';
+var VERSION = 'board-v14';
 var CORE = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-192.png', './icon-512.png', './firebase-config.js'];
 
 self.addEventListener('install', function (e) {
@@ -29,7 +29,7 @@ self.addEventListener('fetch', function (e) {
   // Same-origin files + Google Fonts (Tajawal) + the Firebase SDK files: cache first, fill on first use.
   // (Firestore / sign-in traffic itself is never cached.)
   var firebaseSdk = url.hostname === 'www.gstatic.com' && url.pathname.indexOf('/firebasejs/') === 0;
-  var pdfLibs = url.hostname === 'cdn.jsdelivr.net' && /^\/npm\/(html-to-image|jspdf)@/.test(url.pathname);
+  var pdfLibs = url.hostname === 'cdn.jsdelivr.net' && /^\/npm\/(html-to-image|jspdf|mediabunny)@/.test(url.pathname);
   if (url.origin === location.origin || /fonts\.(googleapis|gstatic)\.com$/.test(url.hostname) || firebaseSdk || pdfLibs) {
     e.respondWith(caches.match(req).then(function (hit) {
       return hit || fetch(req).then(function (res) {

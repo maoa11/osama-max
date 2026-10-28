@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>الفيديو</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+/* Client-facing video page. Everything it shows comes from the link itself (after #),
+   so it needs no account and no database: brand colors, titles and Drive file ids. */
+:root{ --p:#2EF2C9; --s:#AEFCE5; --d:#004855; --a:#FDE68A; }
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+body{font-family:"Tajawal",system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;color:var(--d);background:#F6FAF9;min-height:100vh;line-height:1.6;-webkit-text-size-adjust:100%}
+.top{background:var(--p);position:relative;overflow:hidden;padding:28px 20px 34px}
+.top::before{content:"";position:absolute;width:240px;height:240px;background:var(--s);left:-70px;top:-60px;border-radius:40px;transform:rotate(-8deg)}
+.top::after{content:"";position:absolute;width:180px;height:260px;background:var(--s);left:60px;bottom:-200px;border-radius:120px 120px 0 0}
+.top>*{position:relative;z-index:1;max-width:860px;margin:0 auto}
+.brand{font-weight:800;font-size:22px}
+.month{font-size:15px;opacity:.85;margin-top:2px}
+main{max-width:860px;margin:-18px auto 0;padding:0 16px 40px;position:relative;z-index:2}
+.head{background:#fff;border-radius:22px;padding:20px 22px;box-shadow:0 6px 24px rgba(0,40,40,.08)}
+.chip{display:inline-block;background:var(--s);font-size:13px;font-weight:700;padding:2px 12px;border-radius:999px}
+h1{font-size:26px;font-weight:800;line-height:1.35;margin-top:8px}
+.note{color:#4E6066;margin-top:6px}
+.vids{display:grid;gap:16px;margin-top:18px}
+@media (min-width:760px){ .vids.many{grid-template-columns:1fr 1fr} }
+.vid{background:#fff;border-radius:22px;padding:12px;box-shadow:0 6px 24px rgba(0,40,40,.08)}
+.frame{position:relative;width:100%;border-radius:14px;overflow:hidden;background:var(--d)}
+.frame.l{aspect-ratio:16/9}
+.frame.p{aspect-ratio:9/16;max-width:420px;margin:0 auto}
+.frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.cap{display:flex;align-items:center;gap:10px;padding:10px 6px 2px;font-weight:700}
+.num{width:30px;height:30px;border-radius:9px;background:var(--d);color:var(--p);display:grid;place-items:center;font-size:14px;flex-shrink:0}
+.cap a{margin-inline-start:auto;font-size:13px;color:var(--d);opacity:.7}
+.hint{text-align:center;font-size:13px;color:#7A8C90;margin-top:18px}
+footer{text-align:center;font-size:13px;color:#7A8C90;padding:10px 16px 28px}
+.err{max-width:480px;margin:80px auto;text-align:center;padding:24px}
+</style>
+</head>
+<body>
+<div id="page" hidden>
+  <header class="top"><div><div class="brand" id="brand"></div><div class="month" id="month"></div></div></header>
+  <main>
+    <div class="head"><span class="chip" id="type"></span><h1 id="title"></h1><p class="note" id="note" hidden></p></div>
+    <div class="vids" id="vids"></div>
+    <p class="hint">لو ظهرت رسالة إن الفيديو قيد المعالجة، حدّث الصفحة بعد دقايق.</p>
+  </main>
+  <footer>التقرير الشهري · إعداد أسامة أنور</footer>
+</div>
+<div class="err" id="err" hidden><h1>الرابط غير مكتمل</h1><p class="note">افتح الفيديو من زر «شاهد الفيديو» في التقرير.</p></div>
+<script>
+(function(){
+  function decode(h){
+    h = h.replace(/-/g,'+').replace(/_/g,'/'); while(h.length % 4) h += '=';
+    return JSON.parse(decodeURIComponent(escape(atob(h))));
+  }
+  function txt(id, v){ document.getElementById(id).textContent = v || ''; }
+  var d;
+  try{ d = decode(location.hash.slice(1)); }catch(e){ d = null; }
+  if(!d || !d.v || !d.v.length){ document.getElementById('err').hidden = false; return; }
+  var k = d.k || [], root = document.documentElement.style, ok = function(c){ return /^#[0-9a-f]{3,8}$/i.test(c||''); };
+  ['--p','--s','--d','--a'].forEach(function(name, i){ if(ok(k[i])) root.setProperty(name, k[i]); });
+  txt('brand', d.c); txt('month', d.m); txt('type', d.y); txt('title', d.t);
+  if(d.n){ txt('note', d.n); document.getElementById('note').hidden = false; }
+  document.title = (d.t || 'الفيديو') + ' — ' + (d.c || '');
+  var box = document.getElementById('vids');
+  if(d.v.length > 1) box.classList.add('many');
+  d.v.forEach(function(v, i){
+    var id = String(v[0]||'').replace(/[^\w-]/g,''); if(!id) return;
+    var card = document.createElement('div'); card.className = 'vid';
+    card.innerHTML = '<div class="frame '+(v[1]==='p'?'p':'l')+'"><iframe src="https://drive.google.com/file/d/'+id+'/preview" allow="autoplay; fullscreen" allowfullscreen loading="lazy" title="فيديو '+(i+1)+'"></iframe></div>'+
+      '<div class="cap"><span class="num">'+(i+1)+'</span><span>فيديو '+(i+1)+'</span><a href="https://drive.google.com/file/d/'+id+'/view" target="_blank" rel="noopener">فتح بحجم كامل</a></div>';
+    box.appendChild(card);
+  });
+  document.getElementById('page').hidden = false;
+})();
+</script>
+</body>
+</html>

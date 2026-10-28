@@ -333,6 +333,10 @@ body.rep-open{overflow:hidden}
 .rchip{background:var(--s);color:var(--d);font-size:13px;font-weight:700;padding:2px 12px;border-radius:999px}
 .rtop b{font-size:21px;font-weight:800;line-height:1.35}
 .rbody p{font-size:15px;color:#4E6066;margin-top:6px;line-height:1.6}
+.rtop a.rtitle{font-size:21px;font-weight:800;line-height:1.35;color:var(--d);text-decoration:none;border-bottom:2px solid var(--p)}
+.rlinks{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.rlink{display:inline-block;background:var(--d);color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;text-decoration:none;white-space:nowrap}
+.rlink.more{background:var(--s);color:var(--d)}
 .rcount{background:var(--a);color:var(--d);font-weight:800;font-size:24px;border-radius:12px;padding:4px 14px;white-space:nowrap;flex-shrink:0}
 .rcount small{font-size:13px;font-weight:700}
 /* video list */
@@ -475,6 +479,7 @@ body.gated{overflow:hidden}
 <div id="gate" hidden><div class="gate-card"><img src="icon-192.png" alt="" width="72" height="72"><h1>لوحة أسامة</h1><p>ادخل بحسابك عشان تنحفظ بياناتك وتلقاها على أي جهاز.</p><button class="btn btn-mint btn-block" data-act="sign-in">الدخول بحساب Google</button></div></div>
 <div class="toast" id="toast"><span id="toast-msg"></span><button id="toast-undo" hidden>تراجع</button></div>
 <input type="file" id="import-file" accept="application/json,.json" hidden>
+<input type="file" id="vid-file" accept="video/*" multiple hidden>
 
 <script>
 /* =========================================================
@@ -1336,6 +1341,164 @@ function brandOf(key){ var b = S.brands[key]; if(!b){ b = S.brands[key] = Object
 function monthLong(mk){ var p=mk.split('-'); return new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn',{month:'long',year:'numeric'}).format(new Date(+p[0],p[1]-1,1)); }
 // Arabic counting: 1 مقطع · 2 مقطعين · 3–10 مقاطع · 11+ مقطع
 function clipWord(x){ x = Math.round(num(x)); return x===2 ? 'مقطعين' : (x>=3 && x<=10) ? 'مقاطع' : 'مقطع'; }
+// videos per report item live in the user's Google Drive; the client opens them on a branded page (v.html)
+function itemVideos(it){ return it.videos || []; }
+function b64url(str){ return btoa(unescape(encodeURIComponent(str))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function viewerUrl(r, it){
+  var b = brandOf(r.client);
+  var data = { c:reportClientName(r.client), m:monthLong(r.month), t:it.title||it.type, y:it.type, n:it.note||'',
+    k:[b.primary,b.soft,b.dark,b.accent], v:itemVideos(it).map(function(v){ return [v.id, v.h>v.w ? 'p' : 'l']; }) };
+  return new URL('v.html', location.href).href.split('#')[0] + '#' + b64url(JSON.stringify(data));
+}
+
+/* ---------- Google Drive upload (drive.file scope: the app only sees files it created) ---------- */
+var Drive = { token:null, exp:0 };
+function driveReady(){ return Drive.token && Date.now() < Drive.exp; }
+function driveAuth(){   // must run inside a tap (opens Google's window)
+  var p = new firebase.auth.GoogleAuthProvider();
+  p.addScope('https://www.googleapis.com/auth/drive.file');
+  if(Cloud.user && Cloud.user.email) p.setCustomParameters({ login_hint:Cloud.user.email });
+  return firebase.auth().currentUser.reauthenticateWithPopup(p).then(function(res){
+    Drive.token = res.credential && res.credential.accessToken; Drive.exp = Date.now() + 50*60*1000;
+    if(!Drive.token) throw new Error('no-token');
+    return Drive.token;
+  });
+}
+function driveFetch(url, opt){
+  opt = opt || {}; opt.headers = Object.assign({ Authorization:'Bearer '+Drive.token }, opt.headers||{});
+  return fetch(url, opt).then(function(r){
+    if(!r.ok) return r.text().then(function(t){ var e = new Error('drive '+r.status); e.status = r.status; e.body = t; throw e; });
+    return r;
+  });
+}
+function driveMkdir(name, parent){
+  var meta = { name:name, mimeType:'application/vnd.google-apps.folder' }; if(parent) meta.parents = [parent];
+  return driveFetch('https://www.googleapis.com/drive/v3/files?fields=id', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(meta) })
+    .then(function(r){ return r.json(); }).then(function(j){ return j.id; });
+}
+function driveFolder(clientKey){
+  var st = S.settings, map = st.driveFolders = st.driveFolders || {};
+  var root = st.driveFolderId ? Promise.resolve(st.driveFolderId)
+    : driveMkdir('لوحة أسامة — فيديوهات العملاء').then(function(id){ st.driveFolderId = id; save(); return id; });
+  return root.then(function(rootId){
+    if(map[clientKey]) return map[clientKey];
+    return driveMkdir(reportClientName(clientKey), rootId).then(function(id){ map[clientKey] = id; save(); return id; });
+  });
+}
+function forgetFolders(clientKey){ if(S.settings.driveFolders) delete S.settings.driveFolders[clientKey]; }
+
+/* compress in the browser before uploading (WebCodecs via Mediabunny): long side ≤ 1280px, ~2.5 Mbps H.264 + AAC.
+   A 43 MB 1080×1920 reel became 6 MB in ~5 s in testing. Falls back to the original file if the device can't. */
+var MB_URL = 'https://cdn.jsdelivr.net/npm/mediabunny@1.61.4/+esm', _mb = null;
+function compressVideo(file, onp){
+  if(file.size < 15*1024*1024 || !window.VideoEncoder) return Promise.resolve({ file:file, compressed:false });
+  return (_mb || (_mb = import(MB_URL))).then(function(MB){
+    var input = new MB.Input({ source:new MB.BlobSource(file), formats:MB.ALL_FORMATS });
+    var output = new MB.Output({ format:new MB.Mp4OutputFormat({ fastStart:'in-memory' }), target:new MB.BufferTarget() });
+    return MB.Conversion.init({ input:input, output:output, audio:{ bitrate:128e3 },
+      video:function(t){ var w = t.displayWidth, h = t.displayHeight; return Math.max(w,h) > 1280 ? (w>=h ? { width:1280, bitrate:2.5e6 } : { height:1280, bitrate:2.5e6 }) : { bitrate:2.5e6 }; } })
+    .then(function(conv){
+      if(!conv.isValid) throw new Error('cannot-convert');
+      conv.onProgress = function(p){ onp(p); };
+      return conv.execute().then(function(){
+        var out = new Blob([output.target.buffer], { type:'video/mp4' });
+        if(out.size >= file.size) return { file:file, compressed:false };          // already small — keep the original
+        return { file:new File([out], file.name.replace(/\.[^.]+$/,'')+'.mp4', { type:'video/mp4' }), compressed:true };
+      });
+    });
+  }).catch(function(e){ console.warn('compress failed, uploading original', e); return { file:file, compressed:false }; });
+}
+function videoDims(file){
+  return new Promise(function(ok){
+    var v = document.createElement('video'), url = URL.createObjectURL(file), done = function(d){ URL.revokeObjectURL(url); ok(d); };
+    v.preload = 'metadata'; v.muted = true; v.onloadedmetadata = function(){ done({ w:v.videoWidth, h:v.videoHeight }); };
+    v.onerror = function(){ done({ w:0, h:0 }); }; setTimeout(function(){ done({ w:0, h:0 }); }, 5000); v.src = url;
+  });
+}
+function driveUploadFile(file, folder, onp){
+  return driveFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id', { method:'POST',
+    headers:{ 'Content-Type':'application/json; charset=UTF-8', 'X-Upload-Content-Type':file.type||'video/mp4', 'X-Upload-Content-Length':String(file.size) },
+    body:JSON.stringify({ name:file.name, parents:[folder] }) })
+  .then(function(r){
+    var session = r.headers.get('Location'); if(!session) throw new Error('no-session');
+    return new Promise(function(ok, no){
+      var x = new XMLHttpRequest(); x.open('PUT', session);
+      x.upload.onprogress = function(e){ if(e.lengthComputable) onp(e.loaded/e.total); };
+      x.onload = function(){ if(x.status===200 || x.status===201){ try{ ok(JSON.parse(x.responseText)); }catch(e){ no(e); } } else { var e = new Error('upload '+x.status); e.status = x.status; no(e); } };
+      x.onerror = function(){ no(new Error('network')); };
+      x.send(file);
+    });
+  })
+  .then(function(j){   // anyone with the link can watch (needed for the client's page)
+    return driveFetch('https://www.googleapis.com/drive/v3/files/'+j.id+'/permissions', { method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ role:'reader', type:'anyone' }) }).then(function(){ return j.id; });
+  });
+}
+var pendingUpload = null;
+function attachVideos(rid, itemId){
+  if(!cloudConfigured() || !Cloud.user){ toast('لازم تدخل بحساب Google أول'); return; }
+  var inp = $('vid-file'); inp.value = '';
+  inp.onchange = function(){
+    var files = [].slice.call(inp.files||[]); if(!files.length) return;
+    var big = files.filter(function(f){ return f.size > 2*1024*1024*1024; });
+    if(big.length){ toast('فيه فيديو أكبر من ٢ جيجا — قصّه أول'); return; }
+    pendingUpload = { rid:rid, itemId:itemId, files:files };
+    if(driveReady()) runUpload();
+    else openSheet('<h3>ربط Google Drive</h3><div class="info">الفيديو ينضغط عشان يصغر حجمه، وبعدين ينرفع في Drive حقك داخل مجلد باسم العميل («لوحة أسامة — فيديوهات العملاء» ← '+esc(reportClientName(byId(S.reports,rid).client))+'). العميل يشوفه من زر في التقرير.</div>'+
+      '<button class="btn btn-mint btn-block" id="dr-go">متابعة مع Google</button>');
+    var go = $('dr-go');
+    if(go) go.onclick = function(){ go.disabled = true; go.textContent = 'ينتظر Google…';
+      driveAuth().then(runUpload).catch(function(e){ console.warn(e); closeSheet(); toast(driveErr(e)); }); };
+  };
+  inp.click();
+}
+function driveErr(e){
+  var c = (e && (e.code||'')) + ' ' + (e && e.body || '');
+  if(/popup-blocked|popup-closed|cancelled-popup/.test(c)) return 'انقفلت نافذة Google — جرّب مرة ثانية';
+  if(/accessNotConfigured|SERVICE_DISABLED|has not been used/.test(c)) return 'لازم تفعّل Google Drive API في مشروع Firebase (مرة وحدة)';
+  if(e && e.status===401){ Drive.token = null; return 'انتهت صلاحية الربط — اضغط مرة ثانية'; }
+  if(e && e.status===403) return 'Google رفض الرفع — تأكد من تفعيل Drive API';
+  if(e && e.message==='network') return 'انقطع النت أثناء الرفع';
+  return 'ما ضبط الرفع';
+}
+function runUpload(){
+  var job = pendingUpload; if(!job) return; pendingUpload = null;
+  var r = byId(S.reports, job.rid), it = r && byId(r.items, job.itemId); if(!it) return;
+  var total = job.files.length, i = 0, okN = 0, saved = 0, lock = null;
+  try{ if(navigator.wakeLock) navigator.wakeLock.request('screen').then(function(l){ lock = l; }).catch(function(){}); }catch(e){}
+  var paint = function(phase, p){
+    openSheet('<h3>'+(phase==='zip'?'يضغط':'يرفع')+' الفيديو '+n(i+1)+' من '+n(total)+'</h3><div class="info" dir="ltr" style="text-align:left">'+esc(job.files[i].name)+'</div>'+
+      '<div class="bar" style="height:14px"><i class="fill" style="width:'+Math.round(p*100)+'%;transition:none"></i></div>'+
+      '<div class="sub">'+(phase==='zip'?'يصغّر الحجم':'يرفع لـDrive')+' · '+n(Math.round(p*100))+'٪ · خلّ الشاشة مفتوحة</div>');
+  };
+  var throttle = function(phase){ var last = -1; return function(p){ if(p-last > .01 || p>=1){ last = p; paint(phase, p); } }; };
+  var step = function(){
+    if(i >= total){
+      if(lock) lock.release().catch(function(){});
+      closeSheet(); render();
+      toast((okN===total ? 'انرفع '+n(okN)+' فيديو ✓' : 'انرفع '+n(okN)+' من '+n(total)) + (saved>1048576 ? ' · وفّرت '+n(saved/1048576)+' ميجا' : ''));
+      return;
+    }
+    var orig = job.files[i], seq = itemVideos(it).length + 1; paint('zip', 0);
+    var name = monthLong(r.month)+' — '+(it.title||it.type)+' ('+seq+').mp4';
+    Promise.all([videoDims(orig), compressVideo(orig, throttle('zip'))]).then(function(a){
+      var dims = a[0], file = a[1].file; saved += orig.size - file.size;
+      var up = new File([file], name, { type:file.type||'video/mp4' });
+      paint('up', 0);
+      var send = function(){ return driveFolder(r.client).then(function(folder){ return driveUploadFile(up, folder, throttle('up')); }); };
+      return send().catch(function(e){
+        if(e && e.status===404){ S.settings.driveFolderId = null; S.settings.driveFolders = {}; return send(); }   // folder deleted from Drive → recreate
+        throw e;
+      }).then(function(id){
+        (it.videos = it.videos || []).push({ id:id, name:name, size:file.size, orig:orig.size, w:dims.w, h:dims.h, at:Date.now() });
+        okN++; save();
+      });
+    }).catch(function(e){ console.warn(e); toast(driveErr(e)); })
+      .then(function(){ i++; step(); });
+  };
+  step();
+}
+
 function reportTotal(r){ return r.items.reduce(function(a,i){return a+num(i.count);},0); }
 function lat(x){ return new Intl.NumberFormat('en-US').format(Math.round(x||0)); }   // report uses Western digits like the client's own decks
 
@@ -1355,7 +1518,7 @@ function renderReports(){
     '<div class="card"><h2 class="sec"><span>وش سويت هالشهر</span><span class="num">'+n(reportTotal(r))+' مقطع</span></h2>'+
       '<ul class="list">'+(r.items.length ? r.items.map(function(it,i){
         return '<li class="item" data-rit="'+it.id+'"><span class="rnum">'+n(i+1)+'</span><div class="t" data-act="rep-item-edit"><b>'+esc(it.title||it.type)+'</b><small>'+esc(it.type)+(it.note?' · '+esc(it.note):'')+'</small></div>'+
-          '<span class="chip sun num">× '+n(it.count)+'</span><button class="x" data-act="rep-item-del" aria-label="حذف">'+ico('x')+'</button></li>';
+          (itemVideos(it).length?'<span class="chip ok">🎬 '+n(itemVideos(it).length)+'</span>':'')+'<span class="chip sun num">× '+n(it.count)+'</span><button class="x" data-act="rep-attach" aria-label="إرفاق فيديو" title="إرفاق فيديو">🎬</button><button class="x" data-act="rep-item-del" aria-label="حذف">'+ico('x')+'</button></li>';
       }).join('') : '<li class="empty">أضف الشغل: النوع، عدد المقاطع، وملاحظة.</li>')+'</ul>'+
       '<form id="rep-add" class="rep-add">'+
         '<div class="row">'+fld('النوع',sel('type',WORK_TYPES.map(function(t){return [t,t];}),'مونتاج'))+fld('عدد المقاطع','<input name="count" inputmode="decimal" value="1" required>')+'</div>'+
@@ -1377,8 +1540,9 @@ function renderReports(){
   if($('rep-vlist')) $('rep-vlist').onchange = function(){ r.showList = this.checked; save(); };
   $('rep-add').onsubmit = function(e){
     e.preventDefault(); var f = formData(this);
-    r.items.push({ id:uid(), type:f.type, title:f.title.trim(), count:num(f.count)||1, note:f.note.trim() });
-    save(); render(); toast('انضاف');
+    r.items.push({ id:uid(), type:f.type, title:f.title.trim(), count:num(f.count)||1, note:f.note.trim(), videos:[] });
+    toast('انضاف — اضغط 🎬 جنبه عشان ترفق فيديو');
+    save(); render();
   };
 }
 function renderReportList(){
@@ -1494,8 +1658,11 @@ function reportDoc(r){
   for(var i=0; i<r.items.length; i+=6){
     pages.push('<section class="rpage">'+head('تفاصيل الشغل', i? 'تابع':'كل اللي انسلّم هالشهر')+'<div class="ritems">'+
       r.items.slice(i,i+6).map(function(it,j){
-        return '<div class="ritem"><span class="rbadge">'+(i+j+1)+'</span><div class="rbody"><div class="rtop"><span class="rchip">'+esc(it.type)+'</span><b>'+esc(it.title||it.type)+'</b></div>'+
-          (it.note?'<p>'+esc(it.note)+'</p>':'')+'</div><span class="rcount">'+lat(it.count)+' <small>'+clipWord(it.count)+'</small></span></div>';
+        var V = itemVideos(it), url = V.length ? viewerUrl(r, it) : '';
+        var title = V.length ? '<a class="rtitle" data-pdf-link href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(it.title||it.type)+'</a>' : '<b>'+esc(it.title||it.type)+'</b>';
+        return '<div class="ritem"><span class="rbadge">'+(i+j+1)+'</span><div class="rbody"><div class="rtop"><span class="rchip">'+esc(it.type)+'</span>'+title+'</div>'+
+          (it.note?'<p>'+esc(it.note)+'</p>':'')+
+          (V.length?'<div class="rlinks"><a class="rlink" data-pdf-link href="'+esc(url)+'" target="_blank" rel="noopener">▶ '+(V.length>1?'شاهد الفيديوهات ('+V.length+')':'شاهد الفيديو')+'</a></div>':'')+'</div><span class="rcount">'+lat(it.count)+' <small>'+clipWord(it.count)+'</small></span></div>';
       }).join('')+'</div>'+foot()+'</section>');
   }
 
@@ -1523,7 +1690,7 @@ function openReport(id){
 // plain-text version for WhatsApp
 function reportText(r){
   var lines = ['التقرير الشهري — '+reportClientName(r.client), monthLong(r.month), '', 'المجموع: '+lat(reportTotal(r))+' '+clipWord(reportTotal(r)), ''];
-  r.items.forEach(function(it,i){ lines.push((i+1)+'. '+(it.title||it.type)+' ('+it.type+') — '+lat(it.count)+(it.note?' · '+it.note:'')); });
+  r.items.forEach(function(it,i){ lines.push((i+1)+'. '+(it.title||it.type)+' ('+it.type+') — '+lat(it.count)+(it.note?' · '+it.note:'')); if(itemVideos(it).length) lines.push('   ▶ '+viewerUrl(r, it)); });
   if(r.notes) lines.push('', 'ملاحظات الشهر:', r.notes);
   if(r.next) lines.push('', 'الخطوة الجاية:', r.next);
   lines.push('', '— أسامة أنور');
@@ -1567,7 +1734,14 @@ function downloadReportPdf(btn){
     return pages.reduce(function(chain, p, i){
       return chain.then(function(){
         return htmlToImage.toJpeg(p, { quality:.92, pixelRatio:2, width:1123, height:794, backgroundColor:'#ffffff', fontEmbedCSS:fontCSS || undefined, style:{ zoom:'1', boxShadow:'none', margin:'0' } });
-      }).then(function(img){ if(i) pdf.addPage([1123,794],'landscape'); pdf.addImage(img,'JPEG',0,0,1123,794); });
+      }).then(function(img){
+        if(i) pdf.addPage([1123,794],'landscape'); pdf.addImage(img,'JPEG',0,0,1123,794);
+        var box = p.getBoundingClientRect();
+        p.querySelectorAll('a[data-pdf-link]').forEach(function(a){
+          var b = a.getBoundingClientRect();
+          pdf.link(b.left-box.left, b.top-box.top, b.width, b.height, { url:a.href });
+        });
+      });
     }, Promise.resolve()).then(function(){ return pdf; });
   }).then(function(pdf){
     var blob = pdf.output('blob'), file = null;
@@ -1976,11 +2150,14 @@ document.addEventListener('click', function(e){
     case 'rep-item-del':
       var rr = byId(S.reports,UI.reportId), ri = rr.items.findIndex(function(x){return x.id===li.dataset.rit;}), ritem = rr.items.splice(ri,1)[0];
       save(); render(); toast('انحذف', function(){ rr.items.splice(ri,0,ritem); save(); render(); }); break;
+    case 'rep-attach': attachVideos(UI.reportId, li.dataset.rit); break;
     case 'rep-item-edit':
       var re = byId(S.reports,UI.reportId), it2 = byId(re.items, li.dataset.rit);
       simpleSheet('تعديل', '<div class="row">'+fld('النوع',sel('type',WORK_TYPES.map(function(t){return [t,t];}),it2.type))+fld('عدد المقاطع','<input name="count" inputmode="decimal" required value="'+esc(it2.count)+'">')+'</div>'+
-        fld('العنوان','<input name="title" value="'+esc(it2.title)+'">')+fld('ملاحظة','<input name="note" value="'+esc(it2.note)+'">'),
-        function(f){ it2.type=f.type; it2.count=num(f.count)||1; it2.title=f.title.trim(); it2.note=f.note.trim(); }); break;
+        fld('العنوان','<input name="title" value="'+esc(it2.title)+'">')+fld('ملاحظة','<input name="note" value="'+esc(it2.note)+'">')+
+        (itemVideos(it2).length ? '<div class="field"><label>الفيديوهات المرفقة</label><ul class="list">'+itemVideos(it2).map(function(v,k){ return '<li class="item"><div class="t"><b dir="ltr" style="text-align:right">'+esc(v.name)+'</b><small>'+n(Math.round(v.size/1048576))+' ميجا'+(v.orig&&v.orig>v.size?' (كان '+n(Math.round(v.orig/1048576))+')':'')+'</small></div><label class="switch" style="border:0;min-height:0"><span class="sub" style="margin:0">إزالة</span><input type="checkbox" name="rm'+k+'"></label></li>'; }).join('')+'</ul></div>' : ''),
+        function(f){ it2.type=f.type; it2.count=num(f.count)||1; it2.title=f.title.trim(); it2.note=f.note.trim();
+          var keep = itemVideos(it2).filter(function(v,k){ var c = document.querySelector('#ss [name=rm'+k+']'); return !(c && c.checked); }); it2.videos = keep; }); break;
     case 'rep-preview': openReport(UI.reportId && current==='reports' && !b.closest('[data-rid]') ? UI.reportId : b.closest('[data-rid]').dataset.rid); break;
     case 'rep-del':
       var rd = byId(S.reports,UI.reportId);
